@@ -25,3 +25,21 @@ java -jar /path/to/repo/Jar/SingleCellQC.jar -i input.bam -c cells.txt.gz -o out
 ```
 
 A more detailed description will be added, as well examples and tests, assuming I ever have the time.
+
+## Output
+
+The output is a matrix with one row per cell barcode in the cell list given. The columns:
+
+**CBC:** Cell barcode
+**antisense: ** Percent of reads that are antisense to some gene (excludes one that are sense in relation to some gene).
+**intergenic: ** Percent of reads that are intergenic.
+**intronic: ** Percent of reads that are intronic.
+**exonic: ** Percent of reads that are exonic.
+**multi: ** Percent of reads that are multimappers (excluded from exonic/intronic/intergenic numbers).
+**unmapped: ** Percent of reads that are unmapped.
+**highConf: ** Percent of reads that map to transcriptome with high conifdence.
+**polyA: ** Percent of uniquelly mapped reads with any number of bases trimmed due to poly-A.
+**TSO: ** Percent of uniquelly mapped reads with any number of bases trimmed due to TSO.
+**total: ** The total number of reads in this cell.
+
+Will likely add more/try to extend beyond CellRanger but that might not be for some time.
