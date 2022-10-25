@@ -46,9 +46,9 @@ The output is a matrix with one row per cell barcode in the cell list given. The
 
 `highConf:` Percent of reads that map to transcriptome with high conifdence.
 
-`polyA:` Percent of uniquelly mapped reads with any number of bases trimmed due to poly-A.
+`polyA:` Percent of reads with any number of bases trimmed due to poly-A (does not count unmapped reads).
 
-`TSO:` Percent of uniquelly mapped reads with any number of bases trimmed due to TSO.
+`TSO:` Percent of reads with any number of bases trimmed due to TSO (does not count unmapped reads).
 
 `total:` The total number of reads in this cell.
 
