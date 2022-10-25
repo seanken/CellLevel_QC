@@ -53,3 +53,17 @@ The output is a matrix with one row per cell barcode in the cell list given. The
 `total:` The total number of reads in this cell.
 
 Will likely add more/try to extend beyond CellRanger but that might not be for some time.
+
+## Build
+
+The jar file was built with gradle. To rerun gradle change directory to the gradle directory and run:
+
+```
+./gradlew build
+```
+
+The new jar will be in app/build/libs.
+
+## Code
+
+The src code is in the src directory. Will work on making cleaner code if I get the chance.
