@@ -21,7 +21,7 @@ public class ReadCounter
 {
 
     //Column names
-    protected String[] colNames={"CBC","antisense","intergenic","intronic","exonic","multi","unmapped","highConf","polyA","TSO","total"}; //Column names in output
+    protected String[] colNames={"CBC","antisense","intergenic","intronic","exonic","multi","unmapped","highConf","polyA","TSO","spliced","percent_qual_cbc","percent_qual_umi","total"}; //Column names in output
 
     //location columns
     protected final int col_anti=0; //column with count of antisense reads
@@ -33,8 +33,11 @@ public class ReadCounter
     protected final int col_hiconf=6; //column with count of reads with high confidence mappings to transcriptome
     protected final int col_polyA=7; //column with count of reads with polyA trimmed off (only counts aligned reads)
     protected final int col_TSO=8; //column with count of reads with TSO trimmed off (only counts aligned reads)
-    protected final int col_tot=9; //column with count of all reads
-    protected final int numCol=11; //Number of columns, including CBC (so the value in col_tot plus 2 if col_tot is last column)
+    protected final int col_splice=9; //column with count of reads with a splice event in them 
+    protected final int col_qual_cbc=10; //column with the proportion of bases with quality>30 in the CBC
+    protected final int col_qual_umi=11; //column with the proportion of bases with quality>30 in the UMI
+    protected final int col_tot=12; //column with count of all reads
+    protected final int numCol=14; //Number of columns, including CBC (so the value in col_tot plus 2 if col_tot is last column)
 
     //Files
     protected File bamFile; //The CellRanger bam file
@@ -97,7 +100,7 @@ public class ReadCounter
 
 
     //Reads each alignment in the bam one by one and gets QC info
-    public void ReadBam(boolean verbose)
+    public void ReadBam(boolean verbose,boolean testingVal)
     {
         print("Read in data!");
         SamReader sr = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(this.bamFile);
@@ -123,25 +126,37 @@ public class ReadCounter
             }
             
             //To speed up testing
-            //if(readNum>100000)
-            //{
-            //    break;
-            //}
+            if(readNum>10000000 & testingVal)
+            {
+                break;
+            }
             ///////
         
-            String cbc=""; //current cell barcode
+            String cbc=null; //current cell barcode
+            String umi=null; //current UMI
+            String cbcQual=null; //current CBC qual string
+            String umiQual=null; //current UMI qual string
+
+
             try{
                 cbc=read.getStringAttribute("CB");
+                umi=read.getStringAttribute("UB");
+                cbcQual=read.getStringAttribute("CY");
+                umiQual=read.getStringAttribute("UY");
             }catch(Exception e){
                 cbc="NotCell";
             }
 
-            
+            if(umi==null | umiQual==null | cbcQual==null)
+            {
+                continue;
+            }
 
             if(!this.Cell2Pos.containsKey(cbc)) 
             {
                 continue;
             }
+
 
             readCounted=readCounted+1; //counts number of reads with CBC in list
             int pos=this.Cell2Pos.get(cbc); //row this cbc appears in
@@ -156,7 +171,13 @@ public class ReadCounter
                 numMapping=0;
             }
 
+            float numMapping_float=numMapping;
 
+            //Update percent bases high quality
+            this.CellQC[pos][this.col_qual_cbc]=PercentHighQual(cbcQual,this.CellQC[pos][this.col_qual_cbc],this.CellQC[pos][this.col_tot],numMapping_float);
+            this.CellQC[pos][this.col_qual_umi]=PercentHighQual(umiQual,this.CellQC[pos][this.col_qual_umi],this.CellQC[pos][this.col_tot],numMapping_float);
+
+            //check if unmapped
             if(numMapping<1)
             {
                 this.CellQC[pos][this.col_unmap]=this.CellQC[pos][this.col_unmap]+1;
@@ -174,10 +195,7 @@ public class ReadCounter
                 numPolyA=0;
             }
 
-            float numMapping_float=numMapping;
-
-            
-
+            //check if any bases trimmed due to being poly-A
             if(numPolyA>0)
             {
                 this.CellQC[pos][this.col_polyA]=this.CellQC[pos][this.col_polyA]+1/numMapping_float;
@@ -191,13 +209,14 @@ public class ReadCounter
                 numTSO=0;
             }
             
+            //check if any bases trimmed due to being TSO
             if(numTSO>0)
             {
                 this.CellQC[pos][this.col_TSO]=this.CellQC[pos][this.col_TSO]+1/numMapping_float;
             }
             
 
-
+            //counts if multimapped
             if(numMapping>1)
             {
                 this.CellQC[pos][this.col_tot]=this.CellQC[pos][this.col_tot]+1/numMapping_float;
@@ -231,7 +250,16 @@ public class ReadCounter
                 this.CellQC[pos][this.col_intergenic]=this.CellQC[pos][this.col_intergenic]+1; //If intergenic
             }
 
+            
+            if(this.IsSpliced(read))
+            {
+                this.CellQC[pos][this.col_splice]=this.CellQC[pos][this.col_splice]+1;
+            }
+
+            
             int xf=0; //to check if confidentially mapped to transcriptome
+
+
 
             try{
                 xf=read.getIntegerAttribute("xf");
@@ -284,6 +312,51 @@ public class ReadCounter
 
     }
 
+    //For a given read checks to see if spliced (so has N's in the cigar string)
+    private boolean IsSpliced(SAMRecord read)
+    {
+        Cigar cigar=read.getCigar();
+        CigarOperator cigarOp=CigarOperator.N;
+        boolean isSpliced=cigar.containsOperator(cigarOp);
+        return(isSpliced);
+    }
+
+    //gets the percent reads with high quality
+    //qual is the quality string from the sequencer
+    //curProp is the current proportion of bases that are high quality (>30)
+    //curReads is the number of reads (not including the current read)
+    //numMapping is the number of locations this read maps to
+    private float PercentHighQual(String qual,float curProp,float curReads,float numMapping)
+    {
+        if(numMapping<1){
+            numMapping=1;
+        }
+
+        //get the proportion for this read
+        int lenQual=qual.length();
+
+        float readProp=0;
+        for(int i=0;i<lenQual;i++)
+        {
+            int score=(int) qual.charAt(i);
+            score=score-33;
+            
+            if(score>30)
+            {
+                readProp=readProp+1;
+            }
+            
+            
+        }
+        readProp=readProp/(float) lenQual;
+
+        //get new proportion
+        
+        float newProp=(curProp*curReads+readProp/numMapping)/(curReads+1/numMapping);
+        
+        return(newProp);
+    }
+
     public void SaveQC()
     {
 
@@ -313,6 +386,11 @@ public class ReadCounter
             {
                 String cell=this.cells.get(i);
                 float[] quant=this.CellQC[i];
+                //For percentages
+
+                quant[this.col_qual_cbc]=100*quant[this.col_qual_cbc];
+
+                quant[this.col_qual_umi]=100*quant[this.col_qual_umi];
                 bw.write(cell,0,cell.length()); //write Cell name
                 for(int j=0;j<numCol-1;j++)
                 {
