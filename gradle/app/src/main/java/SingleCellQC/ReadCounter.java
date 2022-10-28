@@ -21,7 +21,7 @@ public class ReadCounter
 {
 
     //Column names
-    protected String[] colNames={"CBC","antisense","intergenic","intronic","exonic","multi","unmapped","highConf","polyA","TSO","spliced","qual_cbc","qual_umi","total"}; //Column names in output
+    protected String[] colNames={"CBC","antisense","intergenic","intronic","exonic","multi","unmapped","highConf","polyA","TSO","spliced","percent_qual_cbc","percent_qual_umi","total"}; //Column names in output
 
     //location columns
     protected final int col_anti=0; //column with count of antisense reads

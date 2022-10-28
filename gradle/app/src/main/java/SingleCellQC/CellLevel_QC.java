@@ -31,7 +31,7 @@ public class CellLevel_QC
         Option gzipped = new Option("z", "gzipped", false, "if cells are gzipped");
         options.addOption(gzipped);
 
-        Option testing = new Option("t", "test", false, "if in testing mode");
+        Option testing = new Option("t", "test", false, "if want to run in testing mode (only use first 10,000,000 reads)");
         options.addOption(testing);
 
         CommandLineParser parser = new DefaultParser();
@@ -42,7 +42,7 @@ public class CellLevel_QC
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
             System.out.println(e.getMessage());
-            formatter.printHelp("utility-name", options);
+            formatter.printHelp("celllevel_qc", options);
 
             System.exit(1);
         }

@@ -31,6 +31,9 @@ public class CellLevel_QC
         Option gzipped = new Option("z", "gzipped", false, "if cells are gzipped");
         options.addOption(gzipped);
 
+        Option testing = new Option("t", "test", false, "if want to run in testing mode (only use first 10,000,000 reads)");
+        options.addOption(testing);
+
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
         CommandLine cmd=null;
@@ -39,7 +42,7 @@ public class CellLevel_QC
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
             System.out.println(e.getMessage());
-            formatter.printHelp("utility-name", options);
+            formatter.printHelp("celllevel_qc", options);
 
             System.exit(1);
         }
@@ -62,6 +65,7 @@ public class CellLevel_QC
 
         boolean verboseVal=cmd.hasOption("v");
         boolean gzipCells=cmd.hasOption("z");
+        boolean testingVal=cmd.hasOption("t");
 
         print("Inputs:");
         print("Bam: "+inputBamPath);
@@ -69,7 +73,7 @@ public class CellLevel_QC
         print("Output: "+outputPath);
         print("Verbose: "+String.valueOf(verboseVal));
         ReadCounter counter=new ReadCounter(inputBamPath,inputCellPath,outputPath,gzipCells);
-        counter.ReadBam(verboseVal);
+        counter.ReadBam(verboseVal,testingVal);
         counter.SaveQC();
 
     }
