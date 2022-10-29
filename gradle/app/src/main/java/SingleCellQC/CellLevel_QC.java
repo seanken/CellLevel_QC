@@ -9,10 +9,12 @@ public class CellLevel_QC
 {
     public static void main(String[] args)
     {
-        processInputs(args);
+        CommandLine cmd=processInputs(args);
+        GetQC(cmd);
+
     }
 
-    public static void processInputs(String[] args)
+    public static CommandLine processInputs(String[] args)
     {
     
         Options options = new Options();
@@ -26,6 +28,9 @@ public class CellLevel_QC
 
         Option inputMat = new Option("m", "matrix", true, "input UMI count matrix in MM format as in CellRanger (overridden by -d)");
         options.addOption(inputMat);
+
+        Option inputGTF = new Option("g", "gtf", true, "gtf used for CellRanger reference (required for UTR info)");
+        options.addOption(inputGTF);
 
         Option inputDir = new Option("d", "inputDir", true, "input CellRanger outs directory (overrides --input and --cells)");
         options.addOption(inputDir);
@@ -56,15 +61,23 @@ public class CellLevel_QC
 
             System.exit(1);
         }
+        return(cmd);
+    }
+
+
+    public static void GetQC(CommandLine cmd)
+    {
         String inputBamPath=null;
         String inputCellPath=null;
         String inputMatPath=null;
+        String inputGTFPath=null;
+
         if(!cmd.hasOption("d"))
         {
             if(!cmd.hasOption("i") | !cmd.hasOption("c"))
             {
                 print("Need either the -d argument or the -i and -c arguments");
-                formatter.printHelp("celllevel_qc", options);
+                //formatter.printHelp("celllevel_qc", options);
                 System.exit(1);
             }
             inputBamPath = cmd.getOptionValue("input");
@@ -102,7 +115,14 @@ public class CellLevel_QC
         }else{
             print("Matrix Directory: "+inputMatPath);
         }
+
+
         ReadCounter counter=new ReadCounter(inputBamPath,inputCellPath,outputPath,gzipCells);
+        if(inputGTFPath!=null)
+        {
+            print("Process GTF");
+            counter.ProcessGTF(inputGTFPath);
+        }
         counter.ReadBam(verboseVal,testingVal);
         if(inputMatPath!=null)
         {

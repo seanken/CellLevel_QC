@@ -21,7 +21,7 @@ public class ReadCounter
 {
 
     //Column names
-    protected String[] colNames={"CBC","antisense","intergenic","intronic","exonic","multi","unmapped","highConf","polyA","TSO","spliced","percent_qual_cbc","percent_qual_umi","total"}; //Column names in output
+    protected String[] colNames={"CBC","antisense","intergenic","intronic","exonic","multi","unmapped","highConf","polyA","TSO","spliced","percent_qual_cbc","percent_qual_umi","nUMI","filtUMI","3UTR","total"}; //Column names in output
 
     //location columns
     protected final int col_anti=0; //column with count of antisense reads
@@ -36,8 +36,11 @@ public class ReadCounter
     protected final int col_splice=9; //column with count of reads with a splice event in them 
     protected final int col_qual_cbc=10; //column with the proportion of bases with quality>30 in the CBC
     protected final int col_qual_umi=11; //column with the proportion of bases with quality>30 in the UMI
-    protected final int col_tot=12; //column with count of all reads
-    protected final int numCol=14; //Number of columns, including CBC (so the value in col_tot plus 2 if col_tot is last column)
+    protected final int col_umi=12; //Number of UMI in cell
+    protected final int col_filtumi=13; //Number of reads whose UMI was filtered
+    protected final int col_3utr=14; //Number of reads in 3' UTR
+    protected final int col_tot=15; //column with count of all reads
+    protected final int numCol=17; //Number of columns, including CBC (so the value in col_tot plus 2 if col_tot is last column)
 
     //Files
     protected File bamFile; //The CellRanger bam file
@@ -48,6 +51,8 @@ public class ReadCounter
     protected ArrayList<String> cells; //list of CBCs
     protected int numCell; //Number of CBC
     protected HashMap<String, Integer> Cell2Pos; //Maps from cell barcode to position in cells
+    protected HashMap<String, ArrayList<Integer>> GeneToUTRs_start; //maps from Gene to position of UTR start
+    protected HashMap<String, ArrayList<Integer>> GeneToUTRs_end; //maps from Gene to position of UTR end
     protected float[][] CellQC; //A 2 dimensional array, rows are cells, columns correspond to the different quantities of interest
 
     
@@ -105,24 +110,21 @@ public class ReadCounter
         print("Read in data!");
         SamReader sr = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(this.bamFile);
         SAMRecordIterator r = sr.iterator();
-
-
         this.CellQC=new float[this.numCell][numCol-1]; //Stores the QC information we care about
+        int readNum=0; //number of alignments encountered so far
 
-        int readNum=0;
-        int readCounted=0;
-
-
-        
+    
         Instant inst1 = Instant.now();
+        
         while(r.hasNext()) {
 
             SAMRecord read=r.next(); //Current Read
             readNum=readNum+1;
+
+            //if verbose print out current line number
             if(readNum % 1000000==0 & verbose)
             {
                 print(String.valueOf(readNum));
-                print("");
             }
             
             //To speed up testing
@@ -130,8 +132,9 @@ public class ReadCounter
             {
                 break;
             }
-            ///////
-        
+           
+
+            //Get some basic info about the read
             String cbc=null; //current cell barcode
             String umi=null; //current UMI
             String cbcQual=null; //current CBC qual string
@@ -144,10 +147,10 @@ public class ReadCounter
                 cbcQual=read.getStringAttribute("CY");
                 umiQual=read.getStringAttribute("UY");
             }catch(Exception e){
-                cbc="NotCell";
+                print("Issue reading read!");
             }
 
-            if(umi==null | umiQual==null | cbcQual==null)
+            if(umi==null | umiQual==null | cbcQual==null | cbc==null)
             {
                 continue;
             }
@@ -157,10 +160,7 @@ public class ReadCounter
                 continue;
             }
 
-
-            readCounted=readCounted+1; //counts number of reads with CBC in list
             int pos=this.Cell2Pos.get(cbc); //row this cbc appears in
-
 
             int numMapping; //Number position read maps to
             try{
@@ -171,146 +171,194 @@ public class ReadCounter
                 numMapping=0;
             }
 
-            float numMapping_float=numMapping;
+            float numMapping_float=numMapping;//used to avoid overcounting multimapped reads
+            if(numMapping_float<1)
+            {
+                numMapping_float=1; //to deal with unmapped reads
+            }
+
+            //update total reads
+            this.CellQC[pos][this.col_tot]=this.CellQC[pos][this.col_tot]+1/numMapping_float;
 
             //Update percent bases high quality
             this.CellQC[pos][this.col_qual_cbc]=PercentHighQual(cbcQual,this.CellQC[pos][this.col_qual_cbc],this.CellQC[pos][this.col_tot],numMapping_float);
             this.CellQC[pos][this.col_qual_umi]=PercentHighQual(umiQual,this.CellQC[pos][this.col_qual_umi],this.CellQC[pos][this.col_tot],numMapping_float);
-
+            
+            //check if trimmed for TSO/polyA
+            this.CheckIfTrimmed(read,pos,numMapping_float); 
+            
             //check if unmapped
             if(numMapping<1)
             {
                 this.CellQC[pos][this.col_unmap]=this.CellQC[pos][this.col_unmap]+1;
-                this.CellQC[pos][this.col_tot]=this.CellQC[pos][this.col_tot]+1;
                 continue;
             }
-
-            int numPolyA; //Number of bases trimmed for polyA
-            int numTSO; //Number of bases timmed for TSO
-            try{
-                numPolyA=read.getIntegerAttribute("pa");
-            }
-            catch(Exception e)
-            {
-                numPolyA=0;
-            }
-
-            //check if any bases trimmed due to being poly-A
-            if(numPolyA>0)
-            {
-                this.CellQC[pos][this.col_polyA]=this.CellQC[pos][this.col_polyA]+1/numMapping_float;
-            }
-
-            try{
-                numTSO=read.getIntegerAttribute("ts");
-            }
-            catch(Exception e)
-            {
-                numTSO=0;
-            }
             
-            //check if any bases trimmed due to being TSO
-            if(numTSO>0)
-            {
-                this.CellQC[pos][this.col_TSO]=this.CellQC[pos][this.col_TSO]+1/numMapping_float;
-            }
-            
-
             //counts if multimapped
             if(numMapping>1)
             {
-                this.CellQC[pos][this.col_tot]=this.CellQC[pos][this.col_tot]+1/numMapping_float;
                 this.CellQC[pos][this.col_multi]=this.CellQC[pos][this.col_multi]+1/numMapping_float;
                 continue;
             }
-
-            this.CellQC[pos][this.col_tot]=this.CellQC[pos][this.col_tot]+1;
-
-            char readType; //If intergenic, intornic, or exonic
-            try{
-                readType=read.getCharacterAttribute("RE");
-            }
-            catch(Exception e)
-            {
-                continue;
-            }
-
-            if(readType=='E')
-            {
-                this.CellQC[pos][this.col_exonic]=this.CellQC[pos][this.col_exonic]+1; //If exonic
-            }
-
-            if(readType=='N') 
-            {
-                this.CellQC[pos][this.col_intronic]=this.CellQC[pos][this.col_intronic]+1; //If intronic
-            }
-
-            if(readType=='I')
-            {
-                this.CellQC[pos][this.col_intergenic]=this.CellQC[pos][this.col_intergenic]+1; //If intergenic
-            }
-
             
-            if(this.IsSpliced(read))
-            {
-                this.CellQC[pos][this.col_splice]=this.CellQC[pos][this.col_splice]+1;
-            }
-
+            //The below only using uniquelly mapped reads
+            this.RegionMappingTo(read,pos); //exonic, intergenic, intronic           
             
-            int xf=0; //to check if confidentially mapped to transcriptome
-
-
-
-            try{
-                xf=read.getIntegerAttribute("xf");
-            }
-            catch(Exception e)
-            {
-                continue;
-            }
-
-            if(xf % 2==1)
-            {
-                this.CellQC[pos][this.col_hiconf]=this.CellQC[pos][this.col_hiconf]+1; //Adds if hi confidence map to transcriptome
-            }
-
+            if(this.IsSpliced(read)){this.CellQC[pos][this.col_splice]=this.CellQC[pos][this.col_splice]+1;} //checks if spliced
             
-            String antisense;
-            try
-            {
-                antisense=read.getStringAttribute("AN");
-            }
-            catch(Exception e)
-            {
-                continue;
-            }
+            this.CheckUTR(read,pos);
 
-            String gene;
-
-            try
-            {
-                gene=read.getStringAttribute("TX");
-            }
-            catch(Exception e)
-            {
-                continue;
-            }
-
-            if(gene==null & !(antisense==null))
-            {
-                this.CellQC[pos][this.col_anti]=this.CellQC[pos][this.col_anti]+1; //Adds for antisense
-            }
+            this.ProcessXF(read,pos); //gets info from xf tag
+            
+            this.GetAntisense(read,pos); //gets antisense info
 
 
         }
         
         Instant inst2 = Instant.now(); 
         
-        print(Duration.between(inst1, inst2).toString());
+        print("Run time for processing bam: "+Duration.between(inst1, inst2).toString());
         
         print("Total number of alignments: "+String.valueOf(readNum));
 
     }
+
+    //process info from xf tag, gets info about:
+    //1) If high confidence
+    //2) If counted towards UMI
+    //3) If UMI filtered
+    private void ProcessXF(SAMRecord read,int pos)
+    {
+        int xf=0; //to check if confidentially mapped to transcriptome
+
+        try{
+            xf=read.getIntegerAttribute("xf");
+        }
+        catch(Exception e)
+        {
+            print("No xf tag found!");
+            return;
+        }
+
+        if(xf % 2==1)
+        {
+            this.CellQC[pos][this.col_hiconf]=this.CellQC[pos][this.col_hiconf]+1; //Adds if hi confidence map to transcriptome
+        }
+
+        if(xf/8 % 2==1)
+        {
+            this.CellQC[pos][this.col_umi]=this.CellQC[pos][this.col_umi]+1; //Adds 1 if this read is counted as a UMI
+        }
+
+        if(xf/32 % 2==1)
+        {
+            this.CellQC[pos][this.col_filtumi]=this.CellQC[pos][this.col_filtumi]+1; //Adds 1 if the UMI of this read is filtered
+        }
+
+
+    }
+    //check if bases are trimmed (TSO or polyA)
+    private void CheckIfTrimmed(SAMRecord read,int pos,float numMapping_float)
+    {
+        int numPolyA; //Number of bases trimmed for polyA
+        int numTSO; //Number of bases timmed for TSO
+        
+        //to avoid issues with unmapped reads
+        if(numMapping_float<1)
+        {
+            numMapping_float=1;
+        }
+        
+        try{
+            numPolyA=read.getIntegerAttribute("pa");
+        }
+        catch(Exception e)
+        {
+            numPolyA=0;
+        }
+
+        //check if any bases trimmed due to being poly-A
+        if(numPolyA>0)
+        {
+            this.CellQC[pos][this.col_polyA]=this.CellQC[pos][this.col_polyA]+1/numMapping_float;
+        }
+
+        try{
+            numTSO=read.getIntegerAttribute("ts");
+        }
+        catch(Exception e)
+        {
+            numTSO=0;
+        }
+        
+        //check if any bases trimmed due to being TSO
+        if(numTSO>0)
+        {
+            this.CellQC[pos][this.col_TSO]=this.CellQC[pos][this.col_TSO]+1/numMapping_float;
+        }
+
+    }
+
+
+    //Checks if read is intergenic, intronic, exonic
+    private void RegionMappingTo(SAMRecord read,int pos)
+    {
+        char readType; //If intergenic, intornic, or exonic
+        try{
+            readType=read.getCharacterAttribute("RE");
+        }
+        catch(Exception e)
+        {
+            return;
+        }
+
+        if(readType=='E')
+        {
+            this.CellQC[pos][this.col_exonic]=this.CellQC[pos][this.col_exonic]+1; //If exonic
+        }
+
+        if(readType=='N') 
+        {
+            this.CellQC[pos][this.col_intronic]=this.CellQC[pos][this.col_intronic]+1; //If intronic
+        }
+
+        if(readType=='I')
+        {
+            this.CellQC[pos][this.col_intergenic]=this.CellQC[pos][this.col_intergenic]+1; //If intergenic
+        }
+
+    }
+
+    //checks if read is antisense
+    private void GetAntisense(SAMRecord read,int pos)
+    {
+        String antisense=null;
+        try
+        {
+        antisense=read.getStringAttribute("AN");
+        }
+        catch(Exception e)
+        {
+            return;
+        }
+
+        String gene=null;
+
+        try
+        {
+            gene=read.getStringAttribute("TX");
+        }
+        catch(Exception e)
+        {
+            return;
+        }
+
+        if(gene==null & !(antisense==null))
+        {
+            this.CellQC[pos][this.col_anti]=this.CellQC[pos][this.col_anti]+1; //Adds for antisense
+        }
+    }
+
 
     //For a given read checks to see if spliced (so has N's in the cigar string)
     private boolean IsSpliced(SAMRecord read)
@@ -417,6 +465,90 @@ public class ReadCounter
 
     }
 
+    //checks if read in 3' UTR
+    public void CheckUTR(SAMRecord read,int pos)
+    {
+        if(this.GeneToUTRs_start==null)
+        {
+            return;
+        }
+        String gene=read.getStringAttribute("GX");
+        int endRead=read.getAlignmentEnd();
+
+        if(!this.GeneToUTRs_start.containsKey(gene)) 
+        {
+            return;
+        }
+        ArrayList<Integer> UTR_starts=GeneToUTRs_start.get(gene); //start position of UTRs for this gene
+        ArrayList<Integer> UTR_ends=GeneToUTRs_end.get(gene); //start position of UTRs for this gene
+
+        for(int i=0;i<UTR_starts.size();i++)
+        {
+            int start=UTR_starts.get(i);
+            int end=UTR_ends.get(i);
+            if(start < endRead & endRead < end)
+            {
+                this.CellQC[pos][this.col_3utr]=this.CellQC[pos][this.col_3utr]+1;
+                return;
+            }
+        }
+
+
+    }
+
+    public void ProcessGTF(String inputGTFPath)
+    {
+        this.GeneToUTRs_start=new HashMap<String, ArrayList<Integer>>();
+        this.GeneToUTRs_end=new HashMap<String, ArrayList<Integer>>();
+
+        File gtfFile=new File(inputGTFPath);
+       
+        try{
+            Scanner s = new Scanner(gtfFile);
+            while(s.hasNext())
+            {
+                String line=s.next();
+                if(line.charAt(0)=='#')
+                {
+                    continue;
+                }
+                String[] splitLine=line.split("\t");
+                int start=Integer.parseInt(splitLine[4]);
+                int end=Integer.parseInt(splitLine[5]);
+                String lineType=splitLine[2];
+                if(!lineType.equals("UTR") & !lineType.equals("three_prime_utr") & !lineType.equals("five_prime_utr"))
+                {
+                    continue;
+                }
+
+                String gene=getGeneNameGTF(line);//To be added!
+
+                if(!this.GeneToUTRs_start.containsKey(gene))//if gene not in hashmap add new arraylist
+                {
+                    GeneToUTRs_start.put(gene,new ArrayList<Integer>());
+                    GeneToUTRs_end.put(gene,new ArrayList<Integer>());
+                }
+
+                //add start/end to arraylist
+                GeneToUTRs_start.get(gene).add(start);
+                GeneToUTRs_end.get(gene).add(end);
+
+            }
+            s.close();
+        }
+        catch(Exception e){
+            GeneToUTRs_start=null;
+            GeneToUTRs_end=null;
+            print("Issue reading in GTF, will be ignored");
+        }
+        
+    }
+
+    private String getGeneNameGTF(String line)
+    {
+        String gene=line.split("gene_id \"")[1].split("\";")[0];
+        return("");
+    }
 
     public static void print(String output)
     {

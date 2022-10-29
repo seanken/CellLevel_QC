@@ -27,8 +27,16 @@ java -jar /path/to/repo/Jar/SingleCellQC.jar -i input.bam -c cells.txt.gz -o out
 Alternativelly, can feed in a 10X out directory, which will find the bam file, cell file (in the raw directory), and matrix (not used atm):
 
 ```
-java -jar /path/to/repo/Jar/SingleCellQC.jar -d /path/to/cellranger/output/outs
+java -jar /path/to/repo/Jar/SingleCellQC.jar -d /path/to/cellranger/output/outs -o out.txt
 ```
+
+If one would like to count the number of reads overlapping a UTR (counts reads overlapping both the 3' and 5' end) need to pass a gtf with UTRs in it (can have UTR, three_prime_utr, or fivee_prime_utr):
+
+```
+java -jar /path/to/repo/Jar/SingleCellQC.jar -d /path/to/cellranger/output/outs -o out.txt -g genes.gtf
+```
+
+Note -o is required, as is either -d or -c and -i.
 
 A more detailed description will be added, as well examples and tests, assuming I ever have the time.
 
@@ -52,15 +60,19 @@ The output is a matrix with one row per cell barcode in the cell list given. The
 
 `highConf:` Number of reads that map to transcriptome with high conifdence.
 
-`polyA:` Number of reads with any number of bases trimmed due to poly-A (does not count unmapped reads).
+`polyA:` Number of reads with any number of bases trimmed due to poly-A.
 
-`TSO:` Number of reads with any number of bases trimmed due to TSO (does not count unmapped reads).
+`TSO:` Number of reads with any number of bases trimmed due to TSO.
 
-`spliced: ` Number of reads with a splice even in them (only counts uniquelly mapped reads)
+`spliced:` Number of reads with a splice even in them (only counts uniquelly mapped reads)
 
-`percent_qual_cbc: ` Average percent of bases (rounded to the nearest percent) in the CBC over all reads with quality score >30.
+`percent_qual_cbc:` Average percent of bases (rounded to the nearest percent) in the CBC over all reads with quality score >30.
 
-`percent_qual_umi: ` Average percent of bases (rounded to the nearest percent) in the UMI over all reads with quality score >30.
+`percent_qual_umi:` Average percent of bases (rounded to the nearest percent) in the UMI over all reads with quality score >30.
+
+`nUMI:` Number of UMI in this cell.
+
+`UTR:` Number of reads overlapping a known UTR of the gene the are assigned to. Set to 0 if -g is not given.
 
 `total:` The total number of reads in this cell.
 
