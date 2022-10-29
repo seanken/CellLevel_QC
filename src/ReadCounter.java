@@ -321,7 +321,9 @@ public class ReadCounter
         return(isSpliced);
     }
 
-    //gets the percent reads with high quality
+
+
+    //Updates the percent bases with high quality
     //qual is the quality string from the sequencer
     //curProp is the current proportion of bases that are high quality (>30)
     //curReads is the number of reads (not including the current read)
@@ -356,6 +358,13 @@ public class ReadCounter
         
         return(newProp);
     }
+
+
+    public void ProcessMatrix(String MatrixDir)
+    {
+        print("Not yet implemented");
+    }
+
 
     public void SaveQC()
     {
