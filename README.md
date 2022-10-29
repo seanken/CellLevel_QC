@@ -24,6 +24,12 @@ If your cell file is gzipped (so cells.txt.gz) as the list produced by CellRange
 java -jar /path/to/repo/Jar/SingleCellQC.jar -i input.bam -c cells.txt.gz -o out.txt -z
 ```
 
+Alternativelly, can feed in a 10X out directory, which will find the bam file, cell file (in the raw directory), and matrix (not used atm):
+
+```
+java -jar /path/to/repo/Jar/SingleCellQC.jar -d /path/to/cellranger/output/outs
+```
+
 A more detailed description will be added, as well examples and tests, assuming I ever have the time.
 
 ## Output
@@ -32,23 +38,29 @@ The output is a matrix with one row per cell barcode in the cell list given. The
 
 `CBC:` Cell barcode
 
-`antisense:` Percent of reads that are antisense to some gene (excludes one that are sense in relation to some gene).
+`antisense:` Number of reads that are antisense to some gene (excludes one that are sense in relation to some gene).
 
-`intergenic:` Percent of reads that are intergenic.
+`intergenic:` Number of reads that are intergenic.
 
-`intronic:` Percent of reads that are intronic.
+`intronic:` Number of reads that are intronic.
 
-`exonic:` Percent of reads that are exonic.
+`exonic:` Number of reads that are exonic.
 
-`multi:` Percent of reads that are multimappers (excluded from exonic/intronic/intergenic numbers).
+`multi:` Number of reads that are multimappers (excluded from exonic/intronic/intergenic numbers).
 
-`unmapped:` Percent of reads that are unmapped.
+`unmapped:` Number of reads that are unmapped.
 
-`highConf:` Percent of reads that map to transcriptome with high conifdence.
+`highConf:` Number of reads that map to transcriptome with high conifdence.
 
-`polyA:` Percent of reads with any number of bases trimmed due to poly-A (does not count unmapped reads).
+`polyA:` Number of reads with any number of bases trimmed due to poly-A (does not count unmapped reads).
 
-`TSO:` Percent of reads with any number of bases trimmed due to TSO (does not count unmapped reads).
+`TSO:` Number of reads with any number of bases trimmed due to TSO (does not count unmapped reads).
+
+`spliced: ` Number of reads with a splice even in them (only counts uniquelly mapped reads)
+
+`percent_qual_cbc: ` Average percent of bases (rounded to the nearest percent) in the CBC over all reads with quality score >30.
+
+`percent_qual_umi: ` Average percent of bases (rounded to the nearest percent) in the UMI over all reads with quality score >30.
 
 `total:` The total number of reads in this cell.
 
