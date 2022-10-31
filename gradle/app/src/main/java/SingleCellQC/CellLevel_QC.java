@@ -97,6 +97,7 @@ public class CellLevel_QC
 
         boolean verboseVal=cmd.hasOption("v");
         boolean gzipCells=cmd.hasOption("z");
+
         if(cmd.hasOption("d"))
         {
             gzipCells=true;
@@ -118,8 +119,9 @@ public class CellLevel_QC
 
 
         ReadCounter counter=new ReadCounter(inputBamPath,inputCellPath,outputPath,gzipCells);
-        if(inputGTFPath!=null)
+        if(cmd.hasOption("g"))
         {
+            inputGTFPath=cmd.getOptionValue("gtf");
             print("Process GTF");
             counter.ProcessGTF(inputGTFPath);
         }

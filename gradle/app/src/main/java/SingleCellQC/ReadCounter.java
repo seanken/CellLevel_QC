@@ -21,7 +21,7 @@ public class ReadCounter
 {
 
     //Column names
-    protected String[] colNames={"CBC","antisense","intergenic","intronic","exonic","multi","unmapped","highConf","polyA","TSO","spliced","percent_qual_cbc","percent_qual_umi","nUMI","filtUMI","3UTR","total"}; //Column names in output
+    protected String[] colNames={"CBC","antisense","intergenic","intronic","exonic","multi","unmapped","highConf","polyA","TSO","spliced","percent_qual_cbc","percent_qual_umi","nUMI","UTR","total"}; //Column names in output
 
     //location columns
     protected final int col_anti=0; //column with count of antisense reads
@@ -37,10 +37,9 @@ public class ReadCounter
     protected final int col_qual_cbc=10; //column with the proportion of bases with quality>30 in the CBC
     protected final int col_qual_umi=11; //column with the proportion of bases with quality>30 in the UMI
     protected final int col_umi=12; //Number of UMI in cell
-    protected final int col_filtumi=13; //Number of reads whose UMI was filtered
-    protected final int col_3utr=14; //Number of reads in 3' UTR
-    protected final int col_tot=15; //column with count of all reads
-    protected final int numCol=17; //Number of columns, including CBC (so the value in col_tot plus 2 if col_tot is last column)
+    protected final int col_3utr=13; //Number of reads in 3' UTR
+    protected final int col_tot=14; //column with count of all reads
+    protected final int numCol=16; //Number of columns, including CBC (so the value in col_tot plus 2 if col_tot is last column)
 
     //Files
     protected File bamFile; //The CellRanger bam file
@@ -177,6 +176,7 @@ public class ReadCounter
                 numMapping_float=1; //to deal with unmapped reads
             }
 
+
             //update total reads
             this.CellQC[pos][this.col_tot]=this.CellQC[pos][this.col_tot]+1/numMapping_float;
 
@@ -193,6 +193,8 @@ public class ReadCounter
                 this.CellQC[pos][this.col_unmap]=this.CellQC[pos][this.col_unmap]+1;
                 continue;
             }
+
+            this.ProcessXF(read,pos,8,this.col_umi); //gets info from xf tag for nUMI
             
             //counts if multimapped
             if(numMapping>1)
@@ -208,7 +210,7 @@ public class ReadCounter
             
             this.CheckUTR(read,pos);
 
-            this.ProcessXF(read,pos); //gets info from xf tag
+            this.ProcessXF(read,pos,1,this.col_hiconf); //gets info from xf tag for hi confidence reads
             
             this.GetAntisense(read,pos); //gets antisense info
 
@@ -226,8 +228,7 @@ public class ReadCounter
     //process info from xf tag, gets info about:
     //1) If high confidence
     //2) If counted towards UMI
-    //3) If UMI filtered
-    private void ProcessXF(SAMRecord read,int pos)
+    private void ProcessXF(SAMRecord read,int pos,int bitUsed,int col)
     {
         int xf=0; //to check if confidentially mapped to transcriptome
 
@@ -240,20 +241,16 @@ public class ReadCounter
             return;
         }
 
-        if(xf % 2==1)
+
+        if(xf/bitUsed % 2==1)
         {
-            this.CellQC[pos][this.col_hiconf]=this.CellQC[pos][this.col_hiconf]+1; //Adds if hi confidence map to transcriptome
+            this.CellQC[pos][col]=this.CellQC[pos][col]+1; //Adds 1 if this read is counted as a UMI
         }
 
-        if(xf/8 % 2==1)
-        {
-            this.CellQC[pos][this.col_umi]=this.CellQC[pos][this.col_umi]+1; //Adds 1 if this read is counted as a UMI
-        }
-
-        if(xf/32 % 2==1)
-        {
-            this.CellQC[pos][this.col_filtumi]=this.CellQC[pos][this.col_filtumi]+1; //Adds 1 if the UMI of this read is filtered
-        }
+        //if(xf/32 % 2==1)
+        //{
+        //    this.CellQC[pos][this.col_filtumi]=this.CellQC[pos][this.col_filtumi]+1; //Adds 1 if the UMI of this read is filtered
+        //}
 
 
     }
@@ -474,6 +471,7 @@ public class ReadCounter
         }
         String gene=read.getStringAttribute("GX");
         int endRead=read.getAlignmentEnd();
+        int startRead=read.getAlignmentStart();
 
         if(!this.GeneToUTRs_start.containsKey(gene)) 
         {
@@ -491,6 +489,13 @@ public class ReadCounter
                 this.CellQC[pos][this.col_3utr]=this.CellQC[pos][this.col_3utr]+1;
                 return;
             }
+
+            if(start < startRead & startRead < end)
+            {
+                this.CellQC[pos][this.col_3utr]=this.CellQC[pos][this.col_3utr]+1;
+                return;
+            }
+
         }
 
 
@@ -507,14 +512,14 @@ public class ReadCounter
             Scanner s = new Scanner(gtfFile);
             while(s.hasNext())
             {
-                String line=s.next();
+                String line=s.nextLine();
                 if(line.charAt(0)=='#')
                 {
                     continue;
                 }
                 String[] splitLine=line.split("\t");
-                int start=Integer.parseInt(splitLine[4]);
-                int end=Integer.parseInt(splitLine[5]);
+                int start=Integer.parseInt(splitLine[3]);
+                int end=Integer.parseInt(splitLine[4]);
                 String lineType=splitLine[2];
                 if(!lineType.equals("UTR") & !lineType.equals("three_prime_utr") & !lineType.equals("five_prime_utr"))
                 {
@@ -522,6 +527,7 @@ public class ReadCounter
                 }
 
                 String gene=getGeneNameGTF(line);//To be added!
+              
 
                 if(!this.GeneToUTRs_start.containsKey(gene))//if gene not in hashmap add new arraylist
                 {
@@ -537,6 +543,7 @@ public class ReadCounter
             s.close();
         }
         catch(Exception e){
+            e.printStackTrace();
             GeneToUTRs_start=null;
             GeneToUTRs_end=null;
             print("Issue reading in GTF, will be ignored");
@@ -547,7 +554,7 @@ public class ReadCounter
     private String getGeneNameGTF(String line)
     {
         String gene=line.split("gene_id \"")[1].split("\";")[0];
-        return("");
+        return(gene);
     }
 
     public static void print(String output)
