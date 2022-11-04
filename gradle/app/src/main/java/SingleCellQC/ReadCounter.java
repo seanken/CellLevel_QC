@@ -37,7 +37,7 @@ public class ReadCounter
     protected final int col_qual_cbc=10; //column with the proportion of bases with quality>30 in the CBC
     protected final int col_qual_umi=11; //column with the proportion of bases with quality>30 in the UMI
     protected final int col_umi=12; //Number of UMI in cell
-    protected final int col_3utr=13; //Number of reads in 3' UTR
+    protected final int col_3utr=13; //Number of reads in UTR
     protected final int col_tot=14; //column with count of all reads
     protected final int numCol=16; //Number of columns, including CBC (so the value in col_tot plus 2 if col_tot is last column)
 
@@ -132,87 +132,7 @@ public class ReadCounter
                 break;
             }
            
-
-            //Get some basic info about the read
-            String cbc=null; //current cell barcode
-            String umi=null; //current UMI
-            String cbcQual=null; //current CBC qual string
-            String umiQual=null; //current UMI qual string
-
-
-            try{
-                cbc=read.getStringAttribute("CB");
-                umi=read.getStringAttribute("UB");
-                cbcQual=read.getStringAttribute("CY");
-                umiQual=read.getStringAttribute("UY");
-            }catch(Exception e){
-                print("Issue reading read!");
-            }
-
-            if(umi==null | umiQual==null | cbcQual==null | cbc==null)
-            {
-                continue;
-            }
-
-            if(!this.Cell2Pos.containsKey(cbc)) 
-            {
-                continue;
-            }
-
-            int pos=this.Cell2Pos.get(cbc); //row this cbc appears in
-
-            int numMapping; //Number position read maps to
-            try{
-                numMapping=read.getIntegerAttribute("NH");
-            }
-            catch(Exception e)
-            {
-                numMapping=0;
-            }
-
-            float numMapping_float=numMapping;//used to avoid overcounting multimapped reads
-            if(numMapping_float<1)
-            {
-                numMapping_float=1; //to deal with unmapped reads
-            }
-
-
-            //update total reads
-            this.CellQC[pos][this.col_tot]=this.CellQC[pos][this.col_tot]+1/numMapping_float;
-
-            //Update percent bases high quality
-            this.CellQC[pos][this.col_qual_cbc]=PercentHighQual(cbcQual,this.CellQC[pos][this.col_qual_cbc],this.CellQC[pos][this.col_tot],numMapping_float);
-            this.CellQC[pos][this.col_qual_umi]=PercentHighQual(umiQual,this.CellQC[pos][this.col_qual_umi],this.CellQC[pos][this.col_tot],numMapping_float);
-            
-            //check if trimmed for TSO/polyA
-            this.CheckIfTrimmed(read,pos,numMapping_float); 
-            
-            //check if unmapped
-            if(numMapping<1)
-            {
-                this.CellQC[pos][this.col_unmap]=this.CellQC[pos][this.col_unmap]+1;
-                continue;
-            }
-
-            this.ProcessXF(read,pos,8,this.col_umi); //gets info from xf tag for nUMI
-            
-            //counts if multimapped
-            if(numMapping>1)
-            {
-                this.CellQC[pos][this.col_multi]=this.CellQC[pos][this.col_multi]+1/numMapping_float;
-                continue;
-            }
-            
-            //The below only using uniquelly mapped reads
-            this.RegionMappingTo(read,pos); //exonic, intergenic, intronic           
-            
-            if(this.IsSpliced(read)){this.CellQC[pos][this.col_splice]=this.CellQC[pos][this.col_splice]+1;} //checks if spliced
-            
-            this.CheckUTR(read,pos);
-
-            this.ProcessXF(read,pos,1,this.col_hiconf); //gets info from xf tag for hi confidence reads
-            
-            this.GetAntisense(read,pos); //gets antisense info
+            this.processRead(read);
 
 
         }
@@ -225,10 +145,96 @@ public class ReadCounter
 
     }
 
+    public void processRead(SAMRecord read)
+    {
+            
+        //Get some basic info about the read
+        String cbc=null; //current cell barcode
+        String umi=null; //current UMI
+        String cbcQual=null; //current CBC qual string
+        String umiQual=null; //current UMI qual string
+
+
+        try{
+            cbc=read.getStringAttribute("CB");
+            umi=read.getStringAttribute("UB");
+            cbcQual=read.getStringAttribute("CY");
+            umiQual=read.getStringAttribute("UY");
+        }catch(Exception e){
+            print("Issue reading read!");
+        }
+
+        if(umi==null | umiQual==null | cbcQual==null | cbc==null)
+        {
+            return;
+        }
+
+        if(!this.Cell2Pos.containsKey(cbc)) 
+        {
+            return;
+        }
+
+        int pos=this.Cell2Pos.get(cbc); //row this cbc appears in
+
+        int numMapping; //Number position read maps to
+        try{
+            numMapping=read.getIntegerAttribute("NH");
+        }
+        catch(Exception e)
+        {
+            numMapping=0;
+        }
+
+        float numMapping_float=1; //used to avoid overcounting multimapped reads, due to addition of check for secondary alignment no longer needed, will remove from code but setting to 1 for now.
+        
+        if(read.isSecondaryOrSupplementary())
+        {
+            return;
+        }
+
+        //update total reads
+        this.CellQC[pos][this.col_tot]=this.CellQC[pos][this.col_tot]+1/numMapping_float;
+
+        //Update percent bases high quality
+        this.CellQC[pos][this.col_qual_cbc]=PercentHighQual(cbcQual,this.CellQC[pos][this.col_qual_cbc],this.CellQC[pos][this.col_tot],numMapping_float);
+        this.CellQC[pos][this.col_qual_umi]=PercentHighQual(umiQual,this.CellQC[pos][this.col_qual_umi],this.CellQC[pos][this.col_tot],numMapping_float);
+        
+        //check if trimmed for TSO/polyA
+        this.CheckIfTrimmed(read,pos,numMapping_float); 
+        
+        //check if unmapped
+        if(numMapping<1)
+        {
+            this.CellQC[pos][this.col_unmap]=this.CellQC[pos][this.col_unmap]+1;
+            return;
+        }
+
+        this.ProcessXF(read,pos,8,this.col_umi); //gets info from xf tag for nUMI
+        
+        //counts if multimapped
+        if(numMapping>1)
+        {
+            this.CellQC[pos][this.col_multi]=this.CellQC[pos][this.col_multi]+1/numMapping_float;
+            return;
+        }
+        
+        //The below only using uniquelly mapped reads
+        this.RegionMappingTo(read,pos); //exonic, intergenic, intronic           
+        
+        if(this.IsSpliced(read)){this.CellQC[pos][this.col_splice]=this.CellQC[pos][this.col_splice]+1;} //checks if spliced
+        
+        this.CheckUTR(read,pos);
+
+        this.ProcessXF(read,pos,1,this.col_hiconf); //gets info from xf tag for hi confidence reads
+        
+        this.GetAntisense(read,pos); //gets antisense info
+
+    }
+
     //process info from xf tag, gets info about:
     //1) If high confidence
     //2) If counted towards UMI
-    private void ProcessXF(SAMRecord read,int pos,int bitUsed,int col)
+    protected void ProcessXF(SAMRecord read,int pos,int bitUsed,int col)
     {
         int xf=0; //to check if confidentially mapped to transcriptome
 
@@ -255,7 +261,7 @@ public class ReadCounter
 
     }
     //check if bases are trimmed (TSO or polyA)
-    private void CheckIfTrimmed(SAMRecord read,int pos,float numMapping_float)
+    protected void CheckIfTrimmed(SAMRecord read,int pos,float numMapping_float)
     {
         int numPolyA; //Number of bases trimmed for polyA
         int numTSO; //Number of bases timmed for TSO
@@ -297,8 +303,11 @@ public class ReadCounter
     }
 
 
+
+
+
     //Checks if read is intergenic, intronic, exonic
-    private void RegionMappingTo(SAMRecord read,int pos)
+    protected void RegionMappingTo(SAMRecord read,int pos)
     {
         char readType; //If intergenic, intornic, or exonic
         try{
@@ -327,7 +336,7 @@ public class ReadCounter
     }
 
     //checks if read is antisense
-    private void GetAntisense(SAMRecord read,int pos)
+    protected void GetAntisense(SAMRecord read,int pos)
     {
         String antisense=null;
         try
@@ -358,7 +367,7 @@ public class ReadCounter
 
 
     //For a given read checks to see if spliced (so has N's in the cigar string)
-    private boolean IsSpliced(SAMRecord read)
+    protected boolean IsSpliced(SAMRecord read)
     {
         Cigar cigar=read.getCigar();
         CigarOperator cigarOp=CigarOperator.N;
@@ -373,7 +382,7 @@ public class ReadCounter
     //curProp is the current proportion of bases that are high quality (>30)
     //curReads is the number of reads (not including the current read)
     //numMapping is the number of locations this read maps to
-    private float PercentHighQual(String qual,float curProp,float curReads,float numMapping)
+    protected float PercentHighQual(String qual,float curProp,float curReads,float numMapping)
     {
         if(numMapping<1){
             numMapping=1;
@@ -462,7 +471,7 @@ public class ReadCounter
 
     }
 
-    //checks if read in 3' UTR
+    //checks if read in UTR
     public void CheckUTR(SAMRecord read,int pos)
     {
         if(this.GeneToUTRs_start==null)
@@ -501,6 +510,7 @@ public class ReadCounter
 
     }
 
+    //Takes a gtf input and extracts information about the UTRs for each gene, saves it in a way that can be used later for figuring out overlap of UTR
     public void ProcessGTF(String inputGTFPath)
     {
         this.GeneToUTRs_start=new HashMap<String, ArrayList<Integer>>();
@@ -551,7 +561,8 @@ public class ReadCounter
         
     }
 
-    private String getGeneNameGTF(String line)
+    //Extracts gene_id from a line in a gtf file
+    protected String getGeneNameGTF(String line)
     {
         String gene=line.split("gene_id \"")[1].split("\";")[0];
         return(gene);
@@ -560,6 +571,24 @@ public class ReadCounter
     public static void print(String output)
     {
         System.out.println(output);
+    }
+
+    //get table of results, mostly for testing purposes
+    public float[][] GetResults()
+    {
+        return(this.CellQC);
+    }
+
+    //Get colnames of table of results, mostly for testing purposes
+    public String[] GetColnames()
+    {
+        return(this.colNames);
+    }
+
+    //Compares this scripts output to the results in the metric file returned by CellRanger
+    public void sanityCheck(String metricFile)
+    {
+        print("Work in progress!");
     }
 
 }

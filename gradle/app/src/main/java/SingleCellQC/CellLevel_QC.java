@@ -14,6 +14,7 @@ public class CellLevel_QC
 
     }
 
+    //processes the inputs so can be used to run command
     public static CommandLine processInputs(String[] args)
     {
     
@@ -49,6 +50,9 @@ public class CellLevel_QC
         Option testing = new Option("t", "test", false, "if want to run in testing mode (only use first 10,000,000 reads if true)");
         options.addOption(testing);
 
+        Option checking = new Option("s", "sanityCheck", false, "runs a few sanity check on results (only works with -d argument)");
+        options.addOption(checking);
+
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
         CommandLine cmd=null;
@@ -64,13 +68,14 @@ public class CellLevel_QC
         return(cmd);
     }
 
-
+    //Based on the inputs runs the QC commmands
     public static void GetQC(CommandLine cmd)
     {
         String inputBamPath=null;
         String inputCellPath=null;
         String inputMatPath=null;
         String inputGTFPath=null;
+        String indirPath=null;
 
         if(!cmd.hasOption("d"))
         {
@@ -86,7 +91,7 @@ public class CellLevel_QC
         }
         else
         {
-            String indirPath=cmd.getOptionValue("d");
+            indirPath=cmd.getOptionValue("d");
             inputBamPath=indirPath+"/possorted_genome_bam.bam";
             inputCellPath=indirPath+"/raw_feature_bc_matrix/barcodes.tsv.gz";
             inputMatPath=indirPath+"/raw_feature_bc_matrix";
@@ -135,6 +140,18 @@ public class CellLevel_QC
             print("No MM Matrix given, skipping processing");
         }
         counter.SaveQC();
+
+        if(cmd.hasOption("s") & cmd.hasOption("d"))
+        {
+            String metricsComb=indirPath+"/metrics_summary.csv";
+            print("Run sanity check");
+            TestCounter testCount=new TestCounter();
+            print("Check integer");
+            testCount.checkInteger(counter);
+            print("Compare to metric file");
+            testCount.compareToMetricCSV(counter,metricsComb);
+
+        }
 
     }
 
