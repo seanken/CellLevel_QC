@@ -1,22 +1,26 @@
 # CellLevel_QC: Extracting cell level QC metrics from CellRanger barcoded bams
 
-This repository contains java code for a simple command to get cell level mapping information (% reads intronic, intergenic, multimapped, etc) from the output in CellRanger (tested with CellRanger v6 using the include introns flag, should work with more recent versions as well though no gurantees. Should work on spaceranger output as well, and both single nuc and single cell data).
+This repository contains java code for a simple command to get cell level mapping information (number of reads that are intronic, intergenic, multimapped, etc) from the output in CellRanger (tested with CellRanger v5 and v6 using the include introns flag, should work with more recent versions as well though no gurantees. Should work on spaceranger output as well, and both single nuc and single cell data).
 
 ## How to use
 
 To get the cell level QC information use Jar/SingleCellQC.jar. The script requires java (was compiled with version 1.8). 
 
-The most basic way to run, given an outs directory produced by CellRanger (tested with v6), if you want the output to go to out.txt, then you can run
+The most basic way to run, given an outs directory produced by CellRanger (tested with v6) then you can run
 
 ```
 java -jar /path/to/repo/Jar/SingleCellQC.jar -d /path/to/cellranger/output/outs -o out.txt
 ```
+
+Where out.txt can be replaced with the name of your output file of choice.
 
 If one would like to count the number of reads overlapping a UTR (counts reads overlapping both the 3' and 5' end) need to pass a gtf with UTRs in it (can have UTR, three_prime_utr, or fivee_prime_utr):
 
 ```
 java -jar /path/to/repo/Jar/SingleCellQC.jar -d /path/to/cellranger/output/outs -o out.txt -g genes.gtf
 ```
+
+Note the UTR feature has not been properly tested yet so take it's outputs with a grain of salt.
 
 For a more verbose version (printing out a message every million alignments) can add the -v flag. Can also use the -t flag to only run on the first 10 million reads (for testing purposes). Finally there is also the -s flag that runs some basic sanity checks (checking things that should be integers are, things that should be percentages are, and comparing the results to the sample level (as opposed to cell level) metrics file output by 10X).
 
@@ -34,7 +38,7 @@ java -jar /path/to/repo/Jar/SingleCellQC.jar -i input.bam -c cells.txt.gz -o out
 
 Note -o is required, as is either -d or -c and -i.
 
-A more detailed description will be added, as well examples and tests, assuming I ever have the time.
+A more detailed description will be added, as well examples and more tests, assuming I ever have the time.
 
 ## Output
 
@@ -54,7 +58,7 @@ The output is a matrix with one row per cell barcode in the cell list given. The
 
 `unmapped:` Number of reads that are unmapped.
 
-`highConf:` Number of reads that map to transcriptome with high conifdence.
+`highConf:` Number of reads that map to the transcriptome with high conifdence.
 
 `polyA:` Number of reads with any number of bases trimmed due to poly-A.
 
@@ -110,3 +114,13 @@ The new jar will be in app/build/libs.
 ## Code
 
 The src code is in the src directory. Will work on making cleaner code if I get the chance.
+
+## FAQs
+
+**With the sanity check, the results don't perfectly match between the metrics file and the results from CellLevel_QC. Should I be worried?**
+
+Probably not a big issue. In our testing the results were very similiar, though not identical. This is due to the fact that our program and CellRanger use slightly different sets of reads for calculating aggregate values. In particular, we exclude all reads that do not have a CBC matching the cell list. There are also some metrics we use only uniquelly mapped reads while CellRanger includes other reads as well. Large differences might be a sign of an issue, but could also be due to other effects (low number of reads in cells, etc).
+
+**What testing has this program undergone?**
+
+So far the testing is limited (plan on doing more, just haven't had the chance). Most of it has involved comparing the outputs of this program to 10X outputs, either in aggregate (with the -s flag), or on a cell by cell bases (only done with nUMI).
