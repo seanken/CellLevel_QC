@@ -92,10 +92,16 @@ public class TestCounter
         }catch(Exception e){
             print("Exception with reading in metric file!");
         }
-        String[] cols=s.nextLine().split(","); //Metric files column names
-        String line=s.nextLine().replace("%,","_").replace("\",","_");
-        String[] vals=line.split("_"); //metric file values
-        int numMetCols=1+(int)line.chars().filter(ch -> ch == '_').count();
+        String line=s.nextLine();
+        String[] cols=line.split(","); //Metric files column names
+        int numMetCols=1+(int)line.chars().filter(ch -> ch == ',').count();//number of columns in CSV
+
+
+        //String line=s.nextLine().replace("%,","_").replace("\",","_");
+        line=s.nextLine().replace("%","");
+        //String[] vals=line.split("_"); //metric file values
+        String[] vals=parseCSVLine(line,numMetCols);
+        
         
         for(int i=0;i<numCol;i++)
         {
@@ -121,6 +127,41 @@ public class TestCounter
         return(ret);
     }
 
+    //splits apart lines of the metrics CSV file
+    public String[] parseCSVLine(String line,int numMetCols)
+    {
+        boolean inQuotes=false; //if currently in quotations or not
+        int lenString=line.length(); //length of string
+        char[] charList=line.toCharArray(); //string to char array for easy modification
+
+        for(int i=0;i<lenString;i++)
+        {
+            char curChar=charList[i];
+            if(curChar=='\"')
+            {
+                if(inQuotes)
+                {
+                    inQuotes=false;
+                }
+                else{
+                    inQuotes=true;
+                }
+                continue;
+            }
+            if(inQuotes)
+            {
+                continue;
+            }
+            if(curChar==',')
+            {
+                charList[i]='_';
+            }
+
+        }
+        String lineNew=new String(charList);
+        String[] ret=lineNew.split("_");
+        return(ret);
+    }
 
     //Aggregates the output of the counter class by column
     public float[] aggregateCounterVals(ReadCounter counter,String[] colsUseMetric,int numCol)
