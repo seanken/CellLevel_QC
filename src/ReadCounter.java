@@ -69,6 +69,7 @@ public class ReadCounter
         this.outfile=new File(outfile);//the output file
         print("Read in Cell Data");
         this.cells=new ArrayList<String>();
+        this.cells.add("notCell");
         try{
             Scanner s;
             if(!gzip)
@@ -164,14 +165,19 @@ public class ReadCounter
             print("Issue reading read!");
         }
 
-        if(umi==null | umiQual==null | cbcQual==null | cbc==null)
+        if(umiQual==null | cbcQual==null)
         {
             return;
         }
 
+        if(cbc==null)
+        {
+            cbc="notCell";
+        }
+
         if(!this.Cell2Pos.containsKey(cbc)) 
         {
-            return;
+            cbc="notCell";
         }
 
         int pos=this.Cell2Pos.get(cbc); //row this cbc appears in
@@ -210,6 +216,8 @@ public class ReadCounter
         }
 
         this.ProcessXF(read,pos,8,this.col_umi); //gets info from xf tag for nUMI
+
+        this.RegionMappingTo(read,pos); //exonic, intergenic, intronic  
         
         //counts if multimapped
         if(numMapping>1)
@@ -218,8 +226,7 @@ public class ReadCounter
             return;
         }
         
-        //The below only using uniquelly mapped reads
-        this.RegionMappingTo(read,pos); //exonic, intergenic, intronic           
+        //The below only using uniquelly mapped reads         
         
         if(this.IsSpliced(read)){this.CellQC[pos][this.col_splice]=this.CellQC[pos][this.col_splice]+1;} //checks if spliced
         

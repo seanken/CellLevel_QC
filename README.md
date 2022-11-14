@@ -54,7 +54,7 @@ The output is a matrix with one row per cell barcode in the cell list given. The
 
 `exonic:` Number of reads that are exonic.
 
-`multi:` Number of reads that are multimappers (excluded from exonic/intronic/intergenic numbers).
+`multi:` Number of reads that are multimappers.
 
 `unmapped:` Number of reads that are unmapped.
 

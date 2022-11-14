@@ -18,7 +18,7 @@ Cells are gzipped: true
 Matrix Directory: outs/raw_feature_bc_matrix
 Read in Cell Data
 Read in data!
-Run time for processing bam: PT5.826S
+Run time for processing bam: PT5.961S
 Total number of alignments: 100000
 Process MM Matrix
 Not yet implemented
@@ -28,17 +28,17 @@ Check integer
 Percents check out, as do counts!
 Compare to metric file
 From metric csv, Number of Reads: 100000.0
-From counter, total: 97591.0
+From counter, total: 100000.0
  
 From metric csv, Reads Mapped Confidently to Intergenic Regions: 3.8
-From counter, intergenic: 3.8026047
+From counter, intergenic: 5.619
   
 From metric csv, Reads Mapped Confidently to Intronic Regions: 24.2
-From counter, intronic: 24.131323
+From counter, intronic: 25.979
    
 From metric csv, Reads Mapped Confidently to Exonic Regions: 53.5
-From counter, exonic: 41.394184
+From counter, exonic: 54.702
     
 From metric csv, Reads Mapped Antisense to Gene: 0.9
-From counter, antisense: 0.91709274
+From counter, antisense: 0.939
 ```
