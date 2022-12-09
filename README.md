@@ -72,7 +72,7 @@ The output is a matrix with one row per cell barcode in the cell list given. The
 
 `nUMI:` Number of UMI in this cell.
 
-`UTR:` Number of reads overlapping a known UTR of the gene the are assigned to. Set to 0 if -g is not given.
+`UTR:` Number of reads overlapping a known UTR of the gene the are assigned to. Set to 0 if -g is not given. Note this functionality has not been tested so treat with caution.
 
 `total:` The total number of reads in this cell.
 
@@ -96,7 +96,7 @@ Will likely add more/try to extend beyond CellRanger but that might not be for s
 
  `-t,--test:` Used for testing purposes, ends the program after reading in 10 million alignments from the bam.
 
- `-s,--sanityCheck:` Prints some basic sanity checks of the analysis. In particular, looks to make sure integers are integers, percents are percents, and compares the aggregate results of the QC metrics produced to the sample level results returned by CellRanger. Meant to be used with the -d flag.
+ `-s,--sanityCheck:` Prints some basic sanity checks and a handful of unit tests of the analysis. In particular, looks to make sure integers are integers, percents are percents, and compares the aggregate results of the QC metrics produced to the sample level results returned by CellRanger. Meant to be used with the -d flag.
 
  `-m,--matrix:` Matrix input, not currently used though likely will be some day.
 
@@ -119,8 +119,8 @@ The src code is in the src directory. Will work on making cleaner code if I get 
 
 **With the sanity check, the results don't perfectly match between the metrics file and the results from CellLevel_QC. Should I be worried?**
 
-Probably not a big issue. In our testing the results were very similiar, though not identical. This is due to the fact that our program and CellRanger use slightly different sets of reads for calculating aggregate values. In particular, we exclude all reads that do not have a CBC matching the cell list. There are also some metrics we use only uniquelly mapped reads while CellRanger includes other reads as well. Large differences might be a sign of an issue, but could also be due to other effects (low number of reads in cells, etc).
+We have found almost perfect agreement (up to rounding) with Antisense, Intronic, Exonic, quality, and Intergenic results, but others might very. There are also some metrics we use only uniquelly mapped reads while CellRanger includes other reads as well. Large differences might be a sign of an issue, but could also be due to other effects (low number of reads in cells, etc).
 
 **What testing has this program undergone?**
 
-So far the testing is limited (plan on doing more, just haven't had the chance). Most of it has involved comparing the outputs of this program to 10X outputs, either in aggregate (with the -s flag), or on a cell by cell bases (only done with nUMI).
+So far the testing is limited (plan on doing more, just haven't had the chance). Most of it has involved comparing the outputs of this program to 10X outputs, either in aggregate (with the -s flag), or on a cell by cell bases (only done with nUMI, done manually but will add automatic tests for it at some point). Also a few unit tests where implemented (also run with the -s flag), more will come.

@@ -150,6 +150,9 @@ public class CellLevel_QC
             testCount.checkInteger(counter);
             print("Compare to metric file");
             testCount.compareToMetricCSV(counter,metricsComb);
+            print("Some unit tests");
+            testCount.checkXFParsing(counter);
+            testCount.checkSplice(counter);
 
         }
 

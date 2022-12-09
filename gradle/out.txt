@@ -1,1 +1,0 @@
-CBC	antisense	intergenic	intronic	exonic	multi	unmapped	total

@@ -167,6 +167,7 @@ public class ReadCounter
 
         if(umiQual==null | cbcQual==null)
         {
+            print("No quality score for CBC/UMI");
             return;
         }
 
@@ -316,6 +317,11 @@ public class ReadCounter
     //Checks if read is intergenic, intronic, exonic
     protected void RegionMappingTo(SAMRecord read,int pos)
     {
+        int mapq=read.getMappingQuality();//checks read is high quality
+        if(mapq<255)
+        {
+            return;
+        }
         char readType; //If intergenic, intornic, or exonic
         try{
             readType=read.getCharacterAttribute("RE");
@@ -404,7 +410,7 @@ public class ReadCounter
             int score=(int) qual.charAt(i);
             score=score-33;
             
-            if(score>30)
+            if(score>29)
             {
                 readProp=readProp+1;
             }
@@ -415,7 +421,7 @@ public class ReadCounter
 
         //get new proportion
         
-        float newProp=(curProp*curReads+readProp/numMapping)/(curReads+1/numMapping);
+        float newProp=(curProp*(curReads-1)+readProp)/(curReads);
         
         return(newProp);
     }

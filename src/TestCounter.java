@@ -2,6 +2,7 @@ package SingleCellQC;
 import java.util.*;
 import java.lang.*;
 import java.io.*;
+import htsjdk.samtools.*;
 
 public class TestCounter
 {
@@ -59,21 +60,103 @@ public class TestCounter
     }
 
     //
+    //Check the CIGAR string parsing is correct on a few examples
+    //
+    public void checkSplice(ReadCounter counter)
+    {
+        SAMFileHeader sr = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(counter.bamFile).getFileHeader();
+        SAMRecord testRead=new SAMRecord(sr);
+        Cigar testCigar=new Cigar();
+        CigarOperator[] toAdd={CigarOperator.D,CigarOperator.S,CigarOperator.H,CigarOperator.I,CigarOperator.M,CigarOperator.N};
+        for(int i=0;i<toAdd.length;i++)
+        {
+            CigarElement ce=new CigarElement(5,toAdd[i]);
+            testCigar.add(ce);
+            testRead.setCigar(testCigar);
+            if(counter.IsSpliced(testRead) & toAdd[i]!=CigarOperator.N){
+                print("Fail splicing test");
+                print(toAdd[i].toString());
+                return;
+            }
+            if(!counter.IsSpliced(testRead) & toAdd[i]==CigarOperator.N){
+                print("Fail splicing test");
+                print(toAdd[i].toString());
+                return;
+            }
+        }
+        print("Pass splice test!");
+
+        //testRead.setCigar();
+    }
+
+    //
+    //Checks the XF parsing is done correctly on a few examples
+    //
+    public void checkXFParsing(ReadCounter counter)
+    {
+        SAMFileHeader sr = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(counter.bamFile).getFileHeader();
+        SAMRecord testRead=new SAMRecord(sr);
+        int xf=1;
+        int pos=1;
+        int col=1;
+        testRead.setAttribute("xf",xf);
+        float val=counter.CellQC[pos][col];
+        int bitUsed=1;
+        counter.ProcessXF(testRead,pos,bitUsed,col);
+        if(val+1!=counter.CellQC[pos][col])
+        {
+            print("XF test 1 failed!");
+            return;
+        }
+        bitUsed=2;
+        counter.ProcessXF(testRead,pos,bitUsed,col);
+        if(val+1!=counter.CellQC[pos][col])
+        {
+            print("XF test 2 failed!");
+            return;
+        }
+
+        xf=2;
+        testRead.setAttribute("xf",xf);
+        bitUsed=1;
+        counter.ProcessXF(testRead,pos,bitUsed,col);
+        if(val+1!=counter.CellQC[pos][col])
+        {
+            print("XF test 3 failed!");
+            return;
+        }
+        bitUsed=2;
+        counter.ProcessXF(testRead,pos,bitUsed,col);
+        if(val+2!=counter.CellQC[pos][col])
+        {
+            print("XF test 4 failed!");
+            return;
+        }
+
+        print("Passed XF test!");
+
+    }
+
+    //
     //compares output to metric output from CellRanger. Note do not expect perfect alignment, but most should be close.
     //
     public void compareToMetricCSV(ReadCounter counter,String metricFile)
     {
         String[] colsUseMetric={"Number of Reads","Reads Mapped Confidently to Intergenic Regions",
         "Reads Mapped Confidently to Intronic Regions","Reads Mapped Confidently to Exonic Regions",
-        "Reads Mapped Antisense to Gene"};//columns to use in metric file
+        "Reads Mapped Antisense to Gene","Q30 Bases in Barcode","Q30 Bases in UMI"};//columns to use in metric file
         
         String[] colsUseSC={"total","intergenic",
-        "intronic","exonic","antisense"};//columns to use in counter object
-        int numColsPrint=5;
+        "intronic","exonic","antisense","percent_qual_cbc","percent_qual_umi"};//columns to use in counter object
+        int numColsPrint=colsUseMetric.length;
         float[] vals_csv=loadMetricCSV(metricFile,colsUseMetric,numColsPrint);
         float[] vals_counter=aggregateCounterVals(counter,colsUseSC,numColsPrint);
         for(int i=0;i<numColsPrint;i++)
         {
+            if(colsUseSC[i]=="unmapped"){
+                colsUseSC[i]="mapped";
+                vals_counter[i]=100-vals_counter[i];
+            }
             print("From metric csv, "+colsUseMetric[i]+": "+ Float.toString(vals_csv[i]));
             print("From counter, "+colsUseSC[i]+": "+ Float.toString(vals_counter[i]));
             print(" ");
@@ -171,9 +254,13 @@ public class TestCounter
         int numCells=counter.numCell;
 
         float total=0; //Total number of reads
+        //float total_cells=0; //Total of all reads with a CBC
         for(int j=0;j<numCells;j++)
         {
             total=total+counter.CellQC[j][(counter.numCol-2)];
+            //if(!counter.cells.get(j).equals("notCell")){
+            //    total_cells=total_cells+counter.CellQC[j][(counter.numCol-2)];
+            //}
         }
 
         for(int i=0;i<numCol;i++)
@@ -193,15 +280,26 @@ public class TestCounter
                 ret[i]=-1;
                 continue;
             }
-
             for(int j=0;j<numCells;j++)
             {
-                ret[i]=ret[i]+counter.CellQC[j][(k-1)];
+                if(colsUseMetric[i]=="percent_qual_cbc" | colsUseMetric[i]=="percent_qual_umi")
+                {
+                    float scale_factor=counter.CellQC[j][(counter.numCol-2)];
+                    ret[i]=ret[i]+scale_factor*counter.CellQC[j][(k-1)]/100;
+                }
+                else{
+                    ret[i]=ret[i]+counter.CellQC[j][(k-1)];
+                }
+                
             }
-            if(colsUseMetric[i]!="total" & colsUseMetric[i]!="percent_qual_cbc" & colsUseMetric[i]!="percent_qual_umi")
+            if(colsUseMetric[i]!="total") //& colsUseMetric[i]!="percent_qual_cbc" & colsUseMetric[i]!="percent_qual_umi")
             {
                 ret[i]=100*ret[i]/total;
             }
+            //if(colsUseMetric[i]=="percent_qual_cbc" | colsUseMetric[i]=="percent_qual_umi")
+            //{
+            //    ret[i]=100*ret[i]/total_cells;
+            //}
             
             
         }
