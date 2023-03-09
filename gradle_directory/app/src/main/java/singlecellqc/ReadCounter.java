@@ -1,4 +1,4 @@
-package SingleCellQC;
+package singlecellqc;
 import java.io.FileWriter;
 import java.io.*;
 import htsjdk.samtools.*;
@@ -41,6 +41,7 @@ public class ReadCounter
     protected final int col_tot=14; //column with count of all reads
     protected final int numCol=16; //Number of columns, including CBC (so the value in col_tot plus 2 if col_tot is last column)
 
+    
     //Files
     protected File bamFile; //The CellRanger bam file
     protected File cellFile; //A text file with the cell barcodes being read in, assume not gzipped (will implement later)
@@ -55,6 +56,9 @@ public class ReadCounter
     protected float[][] CellQC; //A 2 dimensional array, rows are cells, columns correspond to the different quantities of interest
 
     
+    //Other params
+    protected String quantUsed; //quanitification method used, options are STARSolo or CellRanger
+
     ////////////////////
     ////Initialize object for counting
     ////bamFile: The name of the bam file from CellRanger
@@ -62,8 +66,9 @@ public class ReadCounter
     ////outfile: The name of the file used for saving the results
     ////gzip: true if cell name file is gzipped
     /////////////////////
-    public ReadCounter(String bamFile,String cellFile,String outfile,boolean gzip)
+    public ReadCounter(String bamFile,String cellFile,String outfile,boolean gzip,String quantUsed)
     {
+        this.quantUsed=quantUsed;
         this.bamFile=new File(bamFile); //The bam file to process
         this.cellFile=new File(cellFile); //the file with CBC info
         this.outfile=new File(outfile);//the output file
@@ -165,11 +170,12 @@ public class ReadCounter
             print("Issue reading read!");
         }
 
-        if(umiQual==null | cbcQual==null)
-        {
-            print("No quality score for CBC/UMI");
-            return;
-        }
+        //Removed to make work with STARSolo
+        //if(umiQual==null | cbcQual==null)
+        //{
+        //    print("No quality score for CBC/UMI");
+        //    return;
+        //}
 
         if(cbc==null)
         {
@@ -203,8 +209,11 @@ public class ReadCounter
         this.CellQC[pos][this.col_tot]=this.CellQC[pos][this.col_tot]+1/numMapping_float;
 
         //Update percent bases high quality
-        this.CellQC[pos][this.col_qual_cbc]=PercentHighQual(cbcQual,this.CellQC[pos][this.col_qual_cbc],this.CellQC[pos][this.col_tot],numMapping_float);
-        this.CellQC[pos][this.col_qual_umi]=PercentHighQual(umiQual,this.CellQC[pos][this.col_qual_umi],this.CellQC[pos][this.col_tot],numMapping_float);
+        if(umiQual!=null & cbcQual!=null)
+        {
+            this.CellQC[pos][this.col_qual_cbc]=PercentHighQual(cbcQual,this.CellQC[pos][this.col_qual_cbc],this.CellQC[pos][this.col_tot],numMapping_float);
+            this.CellQC[pos][this.col_qual_umi]=PercentHighQual(umiQual,this.CellQC[pos][this.col_qual_umi],this.CellQC[pos][this.col_tot],numMapping_float);
+        }
         
         //check if trimmed for TSO/polyA
         this.CheckIfTrimmed(read,pos,numMapping_float); 
@@ -235,7 +244,10 @@ public class ReadCounter
 
         this.ProcessXF(read,pos,1,this.col_hiconf); //gets info from xf tag for hi confidence reads
         
-        this.GetAntisense(read,pos); //gets antisense info
+        if(this.quantUsed=="CellRanger") //Antisense handled by RegionMappingTo if STARSolo
+        {
+            this.GetAntisense(read,pos); //gets antisense info
+        }
 
     }
 
@@ -251,7 +263,7 @@ public class ReadCounter
         }
         catch(Exception e)
         {
-            print("No xf tag found!");
+            //print("No xf tag found!");
             return;
         }
 
@@ -322,13 +334,23 @@ public class ReadCounter
         {
             return;
         }
+
+        
+        
         char readType; //If intergenic, intornic, or exonic
-        try{
-            readType=read.getCharacterAttribute("RE");
-        }
-        catch(Exception e)
+        if(this.quantUsed=="CellRanger")
         {
-            return;
+            try{
+                readType=read.getCharacterAttribute("RE");
+            }
+            catch(Exception e)
+            {
+                return;
+            }
+        }
+        if(this.quantUsed=="STARSolo")
+        {
+            readType=this.getReadType_STARSolo(read);
         }
 
         if(readType=='E')
@@ -346,6 +368,40 @@ public class ReadCounter
             this.CellQC[pos][this.col_intergenic]=this.CellQC[pos][this.col_intergenic]+1; //If intergenic
         }
 
+        if(readType=='A') //only in STARSolo, corresponds to antisense
+        {
+            this.CellQC[pos][this.col_anti]=this.CellQC[pos][this.col_anti]+1;
+        }
+        
+
+    }
+
+    //Gets read type (intronic, etc) for STARSolo data preprocessed with bedtools tag
+    protected char getReadType_STARSolo(SAMRecord read)
+    {
+        String readTypeList=null;
+        try
+        {
+            readTypeList=read.getStringAttribute("RE");
+        }
+        catch(Exception e)
+        {
+            return('I');
+        }
+
+        char readType='I';
+        if(readTypeList==null)
+        {
+            return(readType);
+        }
+        if(readTypeList.contains("E")){
+            readType='E';
+        }else if(readTypeList.contains("N")){
+            readType='N';
+        }else if(readTypeList.contains("A")){
+            readType='A';
+        }
+        return(readType);
     }
 
     //checks if read is antisense
