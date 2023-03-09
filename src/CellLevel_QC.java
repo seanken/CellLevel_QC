@@ -1,4 +1,4 @@
-package SingleCellQC;
+package singlecellqc;
 import java.util.*;
 import java.lang.*;
 import org.apache.commons.cli.*;
@@ -26,6 +26,10 @@ public class CellLevel_QC
         Option inputCell = new Option("c", "cells", true, "input cell names (overriden by -d)");
         //inputCell.setRequired(true);
         options.addOption(inputCell);
+
+        Option quantUsed = new Option("q", "quantused", true, "quantification method used (CellRanger or STARSolo). If STARSolo is used preprocessing is required (see github). Default is CellRanger.");
+        //inputCell.setRequired(true);
+        options.addOption(quantUsed);
 
         Option inputMat = new Option("m", "matrix", true, "input UMI count matrix in MM format as in CellRanger (overridden by -d)");
         options.addOption(inputMat);
@@ -76,6 +80,7 @@ public class CellLevel_QC
         String inputMatPath=null;
         String inputGTFPath=null;
         String indirPath=null;
+        String quantUsed="CellRanger";
 
         if(!cmd.hasOption("d"))
         {
@@ -97,6 +102,22 @@ public class CellLevel_QC
             inputMatPath=indirPath+"/raw_feature_bc_matrix";
         }        
 
+        if(cmd.hasOption("q"))
+        {
+            quantUsed=cmd.getOptionValue("quantused");
+            if(quantUsed!="STARSolo" & quantUsed!="CellRanger")
+            {
+                print("Quantification method used (-q option) must be CellRanger or STARSolo");
+                return;
+            }
+        }
+
+        if(quantUsed=="STARSolo" & cmd.hasOption("d"))
+        {
+            print("Option -d can not be used with STARSolo");
+            return;
+        }
+
 
         String outputPath = cmd.getOptionValue("output");
 
@@ -115,6 +136,7 @@ public class CellLevel_QC
         print("Output: "+outputPath);
         print("Verbose: "+String.valueOf(verboseVal));
         print("Cells are gzipped: "+String.valueOf(gzipCells));
+        print("Quantification method: "+quantUsed);
         if(inputMatPath==null)
         {
             print("Matrix Directory: none");
@@ -123,7 +145,7 @@ public class CellLevel_QC
         }
 
 
-        ReadCounter counter=new ReadCounter(inputBamPath,inputCellPath,outputPath,gzipCells);
+        ReadCounter counter=new ReadCounter(inputBamPath,inputCellPath,outputPath,gzipCells,quantUsed);
         if(cmd.hasOption("g"))
         {
             inputGTFPath=cmd.getOptionValue("gtf");

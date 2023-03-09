@@ -1,4 +1,4 @@
-package SingleCellQC;
+package singlecellqc;
 import java.util.*;
 import java.lang.*;
 import java.io.*;
