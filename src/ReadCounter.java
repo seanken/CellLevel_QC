@@ -337,7 +337,7 @@ public class ReadCounter
 
         
         
-        char readType; //If intergenic, intornic, or exonic
+        char readType='Z'; //If intergenic, intornic, or exonic
         if(this.quantUsed=="CellRanger")
         {
             try{
