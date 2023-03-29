@@ -131,7 +131,7 @@ The src code is in the src directory. Will work on making cleaner code if I get 
 
 **With the sanity check, the results don't perfectly match between the metrics file and the results from CellLevel_QC. Should I be worried?**
 
-We have found almost perfect agreement (up to rounding) with Antisense, Intronic, Exonic, quality, and Intergenic results, but others might very. There are also some metrics we use only uniquelly mapped reads while CellRanger includes other reads as well. Large differences might be a sign of an issue, but could also be due to other effects (low number of reads in cells, etc).
+We have found decent agreement with Antisense, Intronic, Exonic, quality, and Intergenic results, but not perfect. There are also some metrics we use only uniquelly mapped reads while CellRanger includes other reads as well. Large differences might be a sign of an issue, but could also be due to other effects (low number of reads in cells, etc).
 
 **What testing has this program undergone?**
 
