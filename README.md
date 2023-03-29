@@ -100,6 +100,18 @@ Will likely add more/try to extend beyond CellRanger but that might not be for s
 
  `-m,--matrix:` Matrix input, not currently used though likely will be some day.
 
+ `-q,--quantused:` The quantification method used. CellRanger by default, can also be STARSolo.
+
+
+## Using with STARSolo
+
+This tool is built to be used with CellRanger, though with preprocessing can run with STARSolo (note: it has not been well tested with STARSolo so use at your own risk). In particular, need to use scripts/PrepSTARSolo.sh to preprocess the bam file from STARSolo, namely run:
+
+```
+source PrepSTARSolo.sh $bam $gtf $prefix
+```
+
+where bam is the output bam for STARSolo, gtf is the gtf used in the reference, and prefix is the output prefix. Will output a few documents, but the one of interest is ${outprefix}.label.bam which can be used as the input bam to our script. Note many of the QCs are not output for STARSolo.
 
 ## Build
 

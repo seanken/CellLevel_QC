@@ -14,7 +14,8 @@ import java.util.zip.GZIPInputStream;
 //// This class functions to read in and store info about the number of reads per cell
 //// in certain classes (intronic, intergenic, etc) in a CellRanger run. Built to run
 //// with CellRanger v6, should work with other versions as well (though some values
-//// might be off). Note assumes not using a pre-mrna reference (if you are exonic and 
+//// might be off). Can also be made to work with STARSolo with the right preprocessing. 
+//// Note assumes not using a pre-mrna reference (if you are exonic and 
 //// intronic read numbers will be off) though works with the include introns flag.
 //////////////////////////////////////////////////////////
 public class ReadCounter
@@ -54,7 +55,7 @@ public class ReadCounter
     protected HashMap<String, ArrayList<Integer>> GeneToUTRs_start; //maps from Gene to position of UTR start
     protected HashMap<String, ArrayList<Integer>> GeneToUTRs_end; //maps from Gene to position of UTR end
     protected float[][] CellQC; //A 2 dimensional array, rows are cells, columns correspond to the different quantities of interest
-
+    protected boolean useMulti;//boolean indicating if should use multimappers in all QC 
     
     //Other params
     protected String quantUsed; //quanitification method used, options are STARSolo or CellRanger
@@ -66,12 +67,14 @@ public class ReadCounter
     ////outfile: The name of the file used for saving the results
     ////gzip: true if cell name file is gzipped
     /////////////////////
-    public ReadCounter(String bamFile,String cellFile,String outfile,boolean gzip,String quantUsed)
+    public ReadCounter(String bamFile,String cellFile,String outfile,boolean gzip,String quantUsed,boolean useMulti)
     {
-        this.quantUsed=quantUsed;
+        this.quantUsed=quantUsed; 
+        this.useMulti=useMulti;
         this.bamFile=new File(bamFile); //The bam file to process
         this.cellFile=new File(cellFile); //the file with CBC info
         this.outfile=new File(outfile);//the output file
+
         print("Read in Cell Data");
         this.cells=new ArrayList<String>();
         this.cells.add("notCell");
@@ -96,7 +99,7 @@ public class ReadCounter
         }
         this.numCell=this.cells.size();
 
-        this.Cell2Pos=new HashMap<String, Integer>(); //Maps CBC to positive in array
+        this.Cell2Pos=new HashMap<String, Integer>(); //Maps CBC to position in array
         for(int i=0;i<this.numCell;i++)
         {
             String cell=this.cells.get(i);
@@ -119,7 +122,7 @@ public class ReadCounter
         int readNum=0; //number of alignments encountered so far
 
     
-        Instant inst1 = Instant.now();
+        Instant inst1 = Instant.now(); //For timing how long it takes to run
         
         while(r.hasNext()) {
 
@@ -138,7 +141,7 @@ public class ReadCounter
                 break;
             }
            
-            this.processRead(read);
+            this.processRead(read); //The processing of the current aligned read
 
 
         }
@@ -151,6 +154,8 @@ public class ReadCounter
 
     }
 
+
+    //The processing of the current aligned read, extracts QC info
     public void processRead(SAMRecord read)
     {
             
@@ -189,7 +194,7 @@ public class ReadCounter
 
         int pos=this.Cell2Pos.get(cbc); //row this cbc appears in
 
-        int numMapping; //Number position read maps to
+        int numMapping; //Number of positions in genome read maps to
         try{
             numMapping=read.getIntegerAttribute("NH");
         }
@@ -200,7 +205,7 @@ public class ReadCounter
 
         float numMapping_float=1; //used to avoid overcounting multimapped reads, due to addition of check for secondary alignment no longer needed, will remove from code but setting to 1 for now.
         
-        if(read.isSecondaryOrSupplementary())
+        if(read.isSecondaryOrSupplementary() & !this.useMulti)
         {
             return;
         }
@@ -233,10 +238,8 @@ public class ReadCounter
         if(numMapping>1)
         {
             this.CellQC[pos][this.col_multi]=this.CellQC[pos][this.col_multi]+1/numMapping_float;
-            return;
         }
-        
-        //The below only using uniquelly mapped reads         
+               
         
         if(this.IsSpliced(read)){this.CellQC[pos][this.col_splice]=this.CellQC[pos][this.col_splice]+1;} //checks if spliced
         
@@ -244,7 +247,7 @@ public class ReadCounter
 
         this.ProcessXF(read,pos,1,this.col_hiconf); //gets info from xf tag for hi confidence reads
         
-        if(this.quantUsed=="CellRanger") //Antisense handled by RegionMappingTo if STARSolo
+        if(this.quantUsed.equals("CellRanger")) //Antisense handled by RegionMappingTo if STARSolo
         {
             this.GetAntisense(read,pos); //gets antisense info
         }
@@ -273,13 +276,9 @@ public class ReadCounter
             this.CellQC[pos][col]=this.CellQC[pos][col]+1; //Adds 1 if this read is counted as a UMI
         }
 
-        //if(xf/32 % 2==1)
-        //{
-        //    this.CellQC[pos][this.col_filtumi]=this.CellQC[pos][this.col_filtumi]+1; //Adds 1 if the UMI of this read is filtered
-        //}
-
 
     }
+
     //check if bases are trimmed (TSO or polyA)
     protected void CheckIfTrimmed(SAMRecord read,int pos,float numMapping_float)
     {
@@ -332,13 +331,14 @@ public class ReadCounter
         int mapq=read.getMappingQuality();//checks read is high quality
         if(mapq<255)
         {
+            //print("Low qual");
             return;
         }
 
         
         
-        char readType='Z'; //If intergenic, intornic, or exonic
-        if(this.quantUsed=="CellRanger")
+        char readType='Z'; //If intergenic, intornic, or exonic (or, in the case of STARSolo, antisense)
+        if(this.quantUsed.equals("CellRanger"))
         {
             try{
                 readType=read.getCharacterAttribute("RE");
@@ -348,7 +348,7 @@ public class ReadCounter
                 return;
             }
         }
-        if(this.quantUsed=="STARSolo")
+        if(this.quantUsed.equals("STARSolo"))
         {
             readType=this.getReadType_STARSolo(read);
         }

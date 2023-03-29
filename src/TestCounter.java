@@ -4,6 +4,10 @@ import java.lang.*;
 import java.io.*;
 import htsjdk.samtools.*;
 
+
+/////////////////////////
+//This class is meant to perform some simple tests of the ReadCounter class, still a work in progress.
+/////////////////////////
 public class TestCounter
 {
 
@@ -87,6 +91,58 @@ public class TestCounter
         print("Pass splice test!");
 
         //testRead.setCigar();
+    }
+
+    //
+    //Check that region is being chosen correctly
+    //
+    public void checkRegionMappingTo(ReadCounter counter)
+    {
+        SAMFileHeader sr = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(counter.bamFile).getFileHeader();
+        SAMRecord testRead=new SAMRecord(sr);
+        testRead.setMappingQuality(255);
+        int pos=100;
+
+        testRead.setAttribute("RE",'E');
+        float val=counter.CellQC[pos][counter.col_exonic];
+        counter.RegionMappingTo(testRead,pos);
+        float valAfter=counter.CellQC[pos][counter.col_exonic];
+        if(val==valAfter)
+        {
+            print("Fails test 1 for read region");
+            return;
+        }
+
+        testRead.setAttribute("RE",'N');
+        val=counter.CellQC[pos][counter.col_intronic];
+        counter.RegionMappingTo(testRead,pos);
+        valAfter=counter.CellQC[pos][counter.col_intronic];
+        if(val==valAfter)
+        {
+            print("Fails test 2 for read region");
+            return;
+        }
+
+        testRead.setAttribute("RE",'I');
+        val=counter.CellQC[pos][counter.col_intergenic];
+        counter.RegionMappingTo(testRead,pos);
+        valAfter=counter.CellQC[pos][counter.col_intergenic];
+        if(val==valAfter)
+        {
+            print("Fails test 3 for read region");
+            return;
+        }
+
+        testRead.setAttribute("RE",'A');
+        val=counter.CellQC[pos][counter.col_anti];
+        counter.RegionMappingTo(testRead,pos);
+        valAfter=counter.CellQC[pos][counter.col_anti];
+        if(val==valAfter)
+        {
+            print("Fails test 4 for read region");
+            return;
+        }
+        print("Passes region unit test!");
     }
 
     //

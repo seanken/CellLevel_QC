@@ -13,15 +13,15 @@ Inputs:
 Bam: outs/possorted_genome_bam.bam
 Cell File: outs/raw_feature_bc_matrix/barcodes.tsv.gz
 Output: out.txt
-Verbose: false
+Verbose: true
+Use multimappers: false
 Cells are gzipped: true
+Quantification method: CellRanger
 Matrix Directory: outs/raw_feature_bc_matrix
 Read in Cell Data
 Read in data!
-Run time for processing bam: PT1.689S
+Run time for processing bam: PT6.244S
 Total number of alignments: 100000
-Process MM Matrix
-Not yet implemented
 Save file
 Run sanity check
 Check integer
@@ -40,7 +40,7 @@ From metric csv, Reads Mapped Confidently to Exonic Regions: 53.5
 From counter, exonic: 53.49
  
 From metric csv, Reads Mapped Antisense to Gene: 0.9
-From counter, antisense: 0.939
+From counter, antisense: 1.026
  
 From metric csv, Q30 Bases in Barcode: 94.4
 From counter, percent_qual_cbc: 94.43581
@@ -51,4 +51,6 @@ From counter, percent_qual_umi: 93.82268
 Some unit tests
 Passed XF test!
 Pass splice test!
+Passes region unit test!
+To be added: UTR unit tests
 ```

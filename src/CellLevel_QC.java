@@ -4,7 +4,9 @@ import java.lang.*;
 import org.apache.commons.cli.*;
 
 
-
+//
+//This is the class that extracts the input arguments
+//
 public class CellLevel_QC
 {
     public static void main(String[] args)
@@ -18,20 +20,18 @@ public class CellLevel_QC
     public static CommandLine processInputs(String[] args)
     {
     
+        //Sets up options to use
         Options options = new Options();
         Option inputBam = new Option("i", "input", true, "input BAM file from CellRanger (overriden by -d)");
-        //inputBam.setRequired(true);
         options.addOption(inputBam);
 
         Option inputCell = new Option("c", "cells", true, "input cell names (overriden by -d)");
-        //inputCell.setRequired(true);
         options.addOption(inputCell);
 
         Option quantUsed = new Option("q", "quantused", true, "quantification method used (CellRanger or STARSolo). If STARSolo is used preprocessing is required (see github). Default is CellRanger.");
-        //inputCell.setRequired(true);
         options.addOption(quantUsed);
 
-        Option inputMat = new Option("m", "matrix", true, "input UMI count matrix in MM format as in CellRanger (overridden by -d)");
+        Option inputMat = new Option("m", "matrix", true, "input UMI count matrix in MM format as in CellRanger (overridden by -d, not currently used)");
         options.addOption(inputMat);
 
         Option inputGTF = new Option("g", "gtf", true, "gtf used for CellRanger reference (required for UTR info)");
@@ -47,6 +47,9 @@ public class CellLevel_QC
 
         Option verbose = new Option("v", "verbose", false, "to make verbose");
         options.addOption(verbose);
+
+        Option allReads = new Option("a", "all", false, "includes multimappers in all metrics");
+        options.addOption(allReads);
 
         Option gzipped = new Option("z", "gzipped", false, "if cells are gzipped (set to true if -d is given)");
         options.addOption(gzipped);
@@ -72,22 +75,25 @@ public class CellLevel_QC
         return(cmd);
     }
 
+
+
     //Based on the inputs runs the QC commmands
     public static void GetQC(CommandLine cmd)
     {
-        String inputBamPath=null;
-        String inputCellPath=null;
-        String inputMatPath=null;
-        String inputGTFPath=null;
-        String indirPath=null;
-        String quantUsed="CellRanger";
+        String inputBamPath=null; //the input bam from CellRanger or STARSolo
+        String inputCellPath=null; //The path the the file with cell names in it
+        String inputMatPath=null; //The path to the MM matrix
+        String inputGTFPath=null; //Path to the gtf used by CellRanger or STARSolo (optional)
+        String indirPath=null; //Input CellRanger directory if passed as argument
+        String quantUsed="CellRanger"; //Tells us if CellRanger or STARSolo
 
+        
+        //Figure out bam/call path for later use
         if(!cmd.hasOption("d"))
         {
             if(!cmd.hasOption("i") | !cmd.hasOption("c"))
             {
                 print("Need either the -d argument or the -i and -c arguments");
-                //formatter.printHelp("celllevel_qc", options);
                 System.exit(1);
             }
             inputBamPath = cmd.getOptionValue("input");
@@ -102,10 +108,13 @@ public class CellLevel_QC
             inputMatPath=indirPath+"/raw_feature_bc_matrix";
         }        
 
+
+        //Checks what quantification method is used
         if(cmd.hasOption("q"))
         {
             quantUsed=cmd.getOptionValue("quantused");
-            if(quantUsed!="STARSolo" & quantUsed!="CellRanger")
+            
+            if(!quantUsed.equals("STARSolo") & !quantUsed.equals("CellRanger"))
             {
                 print("Quantification method used (-q option) must be CellRanger or STARSolo");
                 return;
@@ -119,10 +128,15 @@ public class CellLevel_QC
         }
 
 
-        String outputPath = cmd.getOptionValue("output");
 
+
+
+        String outputPath = cmd.getOptionValue("output"); //Text file output QC metrics to
+
+        //boolean options
         boolean verboseVal=cmd.hasOption("v");
         boolean gzipCells=cmd.hasOption("z");
+        boolean useMulti=cmd.hasOption("a");
 
         if(cmd.hasOption("d"))
         {
@@ -130,11 +144,14 @@ public class CellLevel_QC
         }
         boolean testingVal=cmd.hasOption("t");
 
+
+        //Prints out settings to screen
         print("Inputs:");
         print("Bam: "+inputBamPath);
         print("Cell File: "+inputCellPath);
         print("Output: "+outputPath);
         print("Verbose: "+String.valueOf(verboseVal));
+        print("Use multimappers: "+String.valueOf(useMulti));
         print("Cells are gzipped: "+String.valueOf(gzipCells));
         print("Quantification method: "+quantUsed);
         if(inputMatPath==null)
@@ -144,25 +161,31 @@ public class CellLevel_QC
             print("Matrix Directory: "+inputMatPath);
         }
 
-
-        ReadCounter counter=new ReadCounter(inputBamPath,inputCellPath,outputPath,gzipCells,quantUsed);
+        //Creates ReadCounter object that will be used for extracting cell level QC with given arguments
+        ReadCounter counter=new ReadCounter(inputBamPath,inputCellPath,outputPath,gzipCells,quantUsed,useMulti);
+        
+        //If gtf is given processes it
         if(cmd.hasOption("g"))
         {
             inputGTFPath=cmd.getOptionValue("gtf");
             print("Process GTF");
             counter.ProcessGTF(inputGTFPath);
         }
-        counter.ReadBam(verboseVal,testingVal);
-        if(inputMatPath!=null)
-        {
-            print("Process MM Matrix");
-            counter.ProcessMatrix(inputMatPath);
-        }
-        else{
-            print("No MM Matrix given, skipping processing");
-        }
-        counter.SaveQC();
 
+
+        counter.ReadBam(verboseVal,testingVal); //Processes the bam to get QC metrics
+        
+        //if(inputMatPath!=null)
+        //{
+        //    print("Process MM Matrix");
+        //    counter.ProcessMatrix(inputMatPath);
+        //}
+        //else{
+        //    print("No MM Matrix given, skipping processing");
+        //}
+        counter.SaveQC(); //save the QC results to table
+
+        //For testing
         if(cmd.hasOption("s") & cmd.hasOption("d"))
         {
             String metricsComb=indirPath+"/metrics_summary.csv";
@@ -175,6 +198,10 @@ public class CellLevel_QC
             print("Some unit tests");
             testCount.checkXFParsing(counter);
             testCount.checkSplice(counter);
+            //to implement
+            testCount.checkRegionMappingTo(counter);
+            //testCount.checkTrim(counter);
+            print("To be added: UTR unit tests");
 
         }
 
