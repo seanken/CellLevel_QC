@@ -29,11 +29,7 @@ task RunQC {
         String output_prefix
         File jarfile
         
-        # Runtime parameters
-        Int memory_gb = 30
-        Int disk_space_gb = 100
-        Int cpu = 1
-        String docker = "amazoncorretto:17"
+        
     }
 
     String output_filename = "~{output_prefix}.txt"
@@ -53,9 +49,9 @@ task RunQC {
     }
 
     runtime {
-        docker: docker
-        memory: "~{memory_gb} GB"
-        disks: "local-disk ~{disk_space_gb} HDD"
-        cpu: cpu
+        docker: "amazoncorretto:17"
+        memory: "40G"
+        disks: "local-disk 100 HDD"
+        cpu: 1
     }
 }
