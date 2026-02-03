@@ -1,0 +1,10 @@
+# Template from https://docs.dockstore.org/en/stable/getting-started/github-apps/github-apps.html
+version: 1
+workflows:
+  - subclass: WDL
+    publish: true
+    primaryDescriptorPath: /GetCellLevelQC.wdl
+    authors:
+      - name: Sean Simmons
+        email: ssimmons@broadinstitute.org
+        affiliation: Broad Institute
