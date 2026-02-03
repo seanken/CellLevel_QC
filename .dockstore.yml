@@ -1,5 +1,5 @@
 # Template from https://docs.dockstore.org/en/stable/getting-started/github-apps/github-apps.html
-version: 1.0
+version: 1.2
 workflows:
   - subclass: WDL
     publish: true
