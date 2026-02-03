@@ -2,8 +2,9 @@ version 1.0
 
 workflow GetCellLevelQC {
     input {
-        File bam_file ##A BAM file containing aligned reads from single-cell RNA-seq experiment, from the CellRanger pipeline
-        File cells_file ##A file containing cell barcodes to be analyzed, expected to be gzipped
+        File? in_dir
+        File bam_file=in_dir+"/possorted_genome_bam.bam" ##A BAM file containing aligned reads from single-cell RNA-seq experiment, from the CellRanger pipeline
+        File cells_file=in_dir+"/filtered_feature_bc_matrix/barcodes.tsv.gz" ##A file containing cell barcodes to be analyzed, expected to be gzipped
         String output_prefix = "cell_qc"
     }
 
