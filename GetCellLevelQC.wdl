@@ -2,9 +2,10 @@ version 1.0
 
 workflow GetCellLevelQC {
     input {
-        File? in_dir
+        String in_dir
         File bam_file=in_dir+"/possorted_genome_bam.bam" ##A BAM file containing aligned reads from single-cell RNA-seq experiment, from the CellRanger pipeline
         File cells_file=in_dir+"/filtered_feature_bc_matrix/barcodes.tsv.gz" ##A file containing cell barcodes to be analyzed, expected to be gzipped
+        File jarfile="gs://fc-secure-b42fb9b0-04ed-4260-9c28-aa1274233114/scripts/SingleCellQC.jar"
         String output_prefix = "cell_qc"
     }
 
@@ -12,7 +13,8 @@ workflow GetCellLevelQC {
         input:
             bam_file = bam_file,
             cells_file = cells_file,
-            output_prefix = output_prefix
+            output_prefix = output_prefix,
+            jarfile=jarfile
     }
 
     output {
@@ -25,6 +27,7 @@ task RunQC {
         File bam_file
         File cells_file
         String output_prefix
+        File jarfile
         
         # Runtime parameters
         Int memory_gb = 30
@@ -37,15 +40,12 @@ task RunQC {
     String jar_filename = "qc_tool.jar"
 
     command <<<
-        # Download JAR file from GitHub
-        wget https://github.com/seanken/CellLevel_QC/raw/refs/heads/main/Jar/SingleCellQC.jar
-        
-        # Run the QC tool
-        java -jar SingleCellQC.jar \
+         # Run the QC tool
+        java -jar ~{jarfile} \
             -i ~{bam_file} \
             -c ~{cells_file} \
             -o ~{output_filename} \
-            -z
+            -z -v
     >>>
 
     output {
