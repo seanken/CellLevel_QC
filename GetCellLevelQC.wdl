@@ -28,30 +28,26 @@ task RunQC {
         File cells_file
         String output_prefix
         File jarfile
-        
-        
     }
 
-    String output_filename = "~{output_prefix}.txt"
-    String jar_filename = "qc_tool.jar"
 
     command <<<
-         # Run the QC tool
         java -jar ~{jarfile} \
             -i ~{bam_file} \
             -c ~{cells_file} \
-            -o ~{output_filename} \
+            -o out.txt \
             -z -v
     >>>
 
     output {
-        File qc_results = output_filename
+        File qc_results = "out.txt"
     }
 
     runtime {
-        docker: "amazoncorretto:17"
+        docker: "amazoncorretto:11"
         memory: "40G"
         disks: "local-disk 100 HDD"
+        zones: "us-central1-b"
         cpu: 1
     }
 }
