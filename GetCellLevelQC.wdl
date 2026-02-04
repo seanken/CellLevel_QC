@@ -7,6 +7,7 @@ workflow GetCellLevelQC {
         File cells_file=in_dir+"/filtered_feature_bc_matrix/barcodes.tsv.gz" ##A file containing cell barcodes to be analyzed, expected to be gzipped
         File jarfile="gs://fc-secure-b42fb9b0-04ed-4260-9c28-aa1274233114/scripts/SingleCellQC.jar"
         String output_prefix = "cell_qc"
+        Int disk_space_gb = 200
     }
 
     call RunQC {
@@ -14,7 +15,8 @@ workflow GetCellLevelQC {
             bam_file = bam_file,
             cells_file = cells_file,
             output_prefix = output_prefix,
-            jarfile=jarfile
+            jarfile=jarfile,
+            disk_space_gb=disk_space_gb
     }
 
     output {
@@ -28,8 +30,8 @@ task RunQC {
         File cells_file
         String output_prefix
         File jarfile
+        Int disk_space_gb
     }
-
 
     command <<<
         java -jar ~{jarfile} \
@@ -46,7 +48,7 @@ task RunQC {
     runtime {
         docker: "amazoncorretto:11"
         memory: "40G"
-        disks: "local-disk 100 HDD"
+        disks: "local-disk ~{disk_space_gb} HDD"
         zones: "us-central1-b"
         cpu: 1
     }
